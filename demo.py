@@ -4,7 +4,7 @@ from functools import reduce
 from itertools import combinations
 from math import ceil
 from pathlib import Path
-from typing import Any, List, Optional, Sequence, Tuple, Union, cast, no_type_check
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union, cast, no_type_check
 from warnings import filterwarnings
 
 import matplotlib
@@ -61,11 +61,11 @@ def ec_local(y: ndarray, y1: ndarray, y2: ndarray) -> float:
     return np.sum(inter) / np.sum(union)
 
 
-def _union(es: list[ndarray]) -> ndarray:
+def _union(es: List[ndarray]) -> ndarray:
     return reduce(lambda e1, e2: e1 | e2, es)
 
 
-def ec_max(y: ndarray, ys: list[ndarray]) -> tuple[float, float]:
+def ec_max(y: ndarray, ys: List[ndarray]) -> Tuple[float, float]:
     es = [y != yy for yy in ys]
     norm = float(np.sum(_union(es)))  # size of largest error set
     ecs = [np.sum(e1 & e2) / norm for (e1, e2) in combinations(es, 2)]
@@ -87,7 +87,7 @@ def gmean(x: ArrayLike) -> float:
     return float(np.exp(np.log(x).mean()))
 
 
-def get_desc(vals: list[float]) -> tuple[float, float, float, float, float]:
+def get_desc(vals: List[float]) -> Tuple[float, float, float, float, float]:
     desc = Series(vals).describe(percentiles=[0.05, 0.95])
     mean = desc["mean"]
     rnge = desc["max"] - desc["min"]
@@ -99,11 +99,11 @@ def get_desc(vals: list[float]) -> tuple[float, float, float, float, float]:
 
 def get_stats(
     y: ndarray,
-    ys: list[ndarray],
-    y_errs: list[ndarray] | None,
-    err_idx: list[ndarray],
+    ys: List[ndarray],
+    y_errs: Optional[List[ndarray]],
+    err_idx: List[ndarray],
     n_classes: int,
-) -> tuple[DataFrame, DataFrame]:
+) -> Tuple[DataFrame, DataFrame]:
     es = [y != yy for yy in ys]
     y_combs = list(combinations(ys, 2))
     e_combs = list(combinations(es, 2))
@@ -255,7 +255,7 @@ def compare_raters(args: Namespace) -> DataFrame:
     return pd.concat([extra, df], axis=1)
 
 
-def compare_error_styles(args: Namespace) -> tuple[DataFrame, DataFrame]:
+def compare_error_styles(args: Namespace) -> Tuple[DataFrame, DataFrame]:
     """Compare ECs and Kappa-based agreement where errors are generated in two ways
 
     Also parameter s, max error set size.
