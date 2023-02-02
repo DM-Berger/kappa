@@ -404,7 +404,9 @@ def run_compare_raters() -> None:
     print(corrs.round(3))
 
 
-def run_compare_styles(n_iter: int = 10000, mode: Literal["append", "overwrite", "cached"] = "cached") -> None:
+def run_compare_styles(
+    n_iter: int = 10000, mode: Literal["append", "overwrite", "cached"] = "cached"
+) -> None:
     dfs = []
     STYLES = ["independent", "dependent"]
     DISTS = ["unif", "exp", "exp-r", "exp2", "exp2-r"]
@@ -429,6 +431,8 @@ def run_compare_styles(n_iter: int = 10000, mode: Literal["append", "overwrite",
             seeds,
         )
     ]
+    if mode == "append" and (not DF_OUT.exists()):
+        mode = "overwrite"
 
     if DF_OUT.exists() and CORRS_OUT.exists() and mode == "cached":
         df_all = pd.read_parquet(DF_OUT)
@@ -456,7 +460,7 @@ def run_compare_styles(n_iter: int = 10000, mode: Literal["append", "overwrite",
         )
 
         df_all = pd.concat([df_old, df_all], axis=0, ignore_index=True)
-        c_all = pd.concat([c_old, c_all ], axis=0, ignore_index=True)
+        c_all = pd.concat([c_old, c_all], axis=0, ignore_index=True)
         df_all.to_parquet(DF_OUT)
         c_all.to_parquet(CORRS_OUT)
     else:
