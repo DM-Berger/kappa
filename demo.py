@@ -404,7 +404,7 @@ def run_compare_raters() -> None:
     print(corrs.round(3))
 
 
-def run_compare_styles(n_iter: int = 10000, force: bool = False) -> None:
+def run_compare_styles(n_iter: int = 10000, mode: Literal["append", "overwrite"] = "append") -> None:
     dfs = []
     STYLES = ["independent", "dependent"]
     DISTS = ["unif", "exp", "exp-r", "exp2", "exp2-r"]
@@ -523,4 +523,4 @@ def run_compare_styles(n_iter: int = 10000, force: bool = False) -> None:
 
 if __name__ == "__main__":
     # run_compare_raters()
-    run_compare_styles(n_iter=50000, force=True)
+    run_compare_styles(n_iter=25000, mode="append")
