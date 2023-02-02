@@ -1,3 +1,4 @@
+import re
 import sys
 from argparse import Namespace
 from functools import reduce
@@ -13,6 +14,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sbn
 from irrCAC.raw import CAC
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 from numpy import ndarray
 from numpy.typing import ArrayLike
 from pandas import DataFrame, Series
@@ -26,7 +29,16 @@ from tqdm.contrib.concurrent import process_map
 from typing_extensions import Literal
 
 # matplotlib.use("QtAgg")
+
+
+def ensure_dir(path: Path) -> Path:
+    path.mkdir(exist_ok=True, parents=True)
+    return path
+
+
 ROOT = Path(__file__).resolve().parent
+PLOTS = ensure_dir(ROOT / "plots")
+
 CORR_STRENGTHS = [((1 - 0.1 * p) / 2, 0.1 * p, (1 - 0.1 * p) / 2) for p in range(11)]
 N = 1000
 N_REP = 20
@@ -155,7 +167,9 @@ def get_stats(
     # distributional stats
     amean, arange, arrange, _, _ = get_desc(accs)
     kmean, krange, krrange, kmax, kmin = get_desc(ks)
-    _, urange, _, umax, umin = get_desc(unions)
+    ecg_mean, ecg_range, ecg_rrange, ecg_max, ecg_min = get_desc(ec_gs)
+    ecl_mean, ecl_range, ecl_rrange, ecl_max, ecl_min = get_desc(ecls)
+    umean, urange, _, umax, umin = get_desc(unions)
 
     means = DataFrame(
         {
@@ -193,6 +207,15 @@ def get_stats(
             "k_rrng": krrange,
             "k_mx": kmax,
             "k_mn": kmin,
+            "ecg_rng": ecg_range,
+            "ecg_rrng": ecg_rrange,
+            "ecg_mx": ecg_max,
+            "ecg_mn": ecg_min,
+            "ecl_rng": ecl_range,
+            "ecl_rrng": ecl_rrange,
+            "ecl_mx": ecl_max,
+            "ecl_mn": ecl_min,
+            "u_mean": umean,
             "u_rng": urange,
             "u_mx": umax,
             "u_mn": umin,
@@ -323,10 +346,12 @@ def compare_error_styles(args: Namespace) -> Tuple[DataFrame, DataFrame]:
         pred_base = rng.choice(CLASSES, size=n_max_err, p=p)
         for yy in ys:
             pred_rand = rng.choice(CLASSES, size=n_max_err, p=p)
-            # Large r means make more predictions random,  so less similar. Essentially,
-            # err_idx below determines which samples are given random predictions
+            # Large r means make more predictions random,  so less similar, and
+            # more indepedent. Essentially, err_idx below determines which
+            # samples are given random predictions.
             # So as r -> 1, almost all samples get a prediction from pred_base,
-            # i.e. all predictions become the same.
+            # i.e. all predictions become the same, and are completely dependent.
+            # As r -> 0, all predictions are completely random, so independent.
 
             base_idx = rng.choice([True, False], size=n_max_err, p=[1 - r, r])
             rand_idx = ~base_idx
@@ -404,10 +429,9 @@ def run_compare_raters() -> None:
     print(corrs.round(3))
 
 
-def run_compare_styles(
-    n_iter: int = 10000, mode: Literal["append", "overwrite", "cached"] = "cached"
-) -> None:
-    dfs = []
+def get_df(
+    n_iter: int = 25000, mode: Literal["append", "overwrite", "cached"] = "cached"
+) -> DataFrame:
     STYLES = ["independent", "dependent"]
     DISTS = ["unif", "exp", "exp-r", "exp2", "exp2-r"]
     ss = np.random.SeedSequence()
@@ -466,26 +490,23 @@ def run_compare_styles(
     else:
         raise ValueError("Missing pre-computed tables.")
 
-    sbn.set_style("darkgrid")
-    grid = sbn.relplot(
-        data=df_all,
-        x="a_mean",
-        y="K",
-        # col="dist",
-        # row="errors",
-        col="errors",
-        hue="sr",
-        palette="rocket",
-        size="n_cls",
+    df = pd.concat(
+        [df_all, c_all.drop(columns=["n_cls", "dist", "errors", "r", "s", "sr"])], axis=1
     )
-    plt.show()
+    # correct the different meaning of "r" in the two cases
+    inds = df["errors"] == "independent"
+    df.loc[inds, "s"] = df.loc[inds, "sr"]
+    df.loc[inds, "r"] = 1.0
+    return df
 
-    dists = pd.get_dummies(df_all[["errors", "dist"]])
+
+def print_descriptions(df: DataFrame) -> None:
+    dists = pd.get_dummies(df[["errors", "dist"]])
     df = pd.concat(
         [
-            df_all.loc[:, "n_cls"].to_frame(),
+            df.loc[:, "n_cls"].to_frame(),
             dists,
-            df_all.drop(columns=["errors", "dist", "n_cls"]),
+            df.drop(columns=["errors", "dist", "n_cls"]),
         ],
         axis=1,
     )
@@ -494,12 +515,12 @@ def run_compare_styles(
     # fmt[0] = "0.0f"
     # print(df.to_markdown(tablefmt="simple", floatfmt=fmt, index=False))
     pd.options.display.max_rows = 1000
-    desc = df_all.groupby(["errors", "dist"]).describe()
+    desc = df.groupby(["errors", "dist"]).describe()
     print(desc.round(3).T)
     print("Min values")
-    print(df_all.groupby(["errors", "dist"]).min().T.round(3))
+    print(df.groupby(["errors", "dist"]).min().T.round(3))
     print("Max values")
-    print(df_all.groupby(["errors", "dist"]).max().T.round(3))
+    print(df.groupby(["errors", "dist"]).max().T.round(3))
     # print("EC / acc_mean correlation:", df.ec_q.corr(df.acc_mean))
     # print("EC / Kappa_y correlation:", df.ec.corr(df.k_y))
     # print("EC / Kappa_e correlation:", df.ec.corr(df.k_e))
@@ -508,7 +529,7 @@ def run_compare_styles(
     print("=" * 80)
     print("Correlations taking into account distributions")
     print("=" * 80)
-    cg = df_all.groupby(["errors", "dist"]).corr("pearson")
+    cg = df.groupby(["errors", "dist"]).corr("pearson")
     print(cg.round(3))
     corrs = df.corr("pearson")
     print(corrs.round(3))
@@ -526,7 +547,7 @@ def run_compare_styles(
     print("=" * 80)
     print("Correlations ignoring distributions")
     print("=" * 80)
-    cg = df_all.drop(columns="dist").groupby(["errors"]).corr("pearson")
+    cg = df.drop(columns="dist").groupby(["errors"]).corr("pearson")
     print(cg.round(3))
     corrs = df.corr("pearson")
     print(corrs.round(3))
@@ -543,6 +564,80 @@ def run_compare_styles(
         print(cg[col].unstack().round(3))
 
 
+def scatter_grid(
+    df: DataFrame,
+    x: str,
+    y: str,
+    title: str,
+    col: Optional[str] = "errors",
+    row: Optional[str] = None,
+    hue: Optional[str] = "r",
+    size: Optional[str] = "n_cls",
+) -> None:
+    sbn.set_style("darkgrid")
+    renames = {
+        "a_mean": "acc_mean",
+        "K": "kappa",
+        "alpha": "Krippendorf's alpha",
+        "ec_g": "EC (global)",
+        "ec_l": "EC (local)",
+        "e_v": "Cramer's V",
+        "s": "Error set max size",
+        "r": "Error independence",
+        "n_cls": "Number of classes",
+    }
+    df = df.rename(columns=renames)
+    x = renames[x] if x in renames else x
+    y = renames[y] if y in renames else y
+    if row is None:
+        corrs = df.groupby(col)[x].corr(df[y])
+    else:
+        corrs = df.groupby([row, col])[x].corr(df[y])
+
+    grid = sbn.relplot(
+        data=df,
+        x=x,
+        y=y,
+        row=renames[row] if row in renames else row,
+        col=renames[col] if col in renames else col,
+        hue=renames[hue] if hue in renames else hue,
+        # palette="rocket_r",
+        # palette="crest",
+        palette="flare",
+        size=renames[size] if size in renames else size,
+    )
+    fig: Figure = plt.gcf()
+    fig.suptitle(title)
+    ax: Axes
+    for ax in grid.axes.flat:
+        errs = ax.get_title().split(" ")[-1]
+        r = f"(Pearson's r={corrs[errs].round(3)})"
+        ax.set_title(f"{ax.get_title()}\n{r}")
+    fig.tight_layout()
+    fig.subplots_adjust(right=0.85)
+    outname = title.replace(" ", "_")
+    outname = re.sub(r"[^a-zA-Z\d_]", "", outname)
+    outfile = PLOTS / f"{outname}.png"
+    plt.savefig(outfile, dpi=200)
+    print(f"Saved plot to {outfile}")
+
+
+def run_compare_styles(
+    n_iter: int = 25000, mode: Literal["append", "overwrite", "cached"] = "cached"
+) -> None:
+    df = get_df(n_iter=n_iter, mode=mode)
+    # print_descriptions(df)
+    scatter_grid(df=df, x="a_mean", y="K", title="Cohen's Kappa vs. Mean Accuracy")
+    scatter_grid(
+        df=df, x="a_mean", y="alpha", title="Krippendorf's Alpha vs. Mean Accuracy"
+    )
+    scatter_grid(df=df, x="a_mean", y="ec_g", title="EC (global) vs. Mean Accuracy")
+    scatter_grid(df=df, x="a_mean", y="ec_l", title="EC (local) vs. Mean Accuracy")
+    scatter_grid(df=df, x="a_mean", y="e_v", title="Cramer's V vs. Mean Accuracy")
+    scatter_grid(df=df, x="ec_g", y="ec_l", title="EC (global) vs. EC (local)")
+
+
 if __name__ == "__main__":
     # run_compare_raters()
-    run_compare_styles(n_iter=25000, mode="append")
+    # run_compare_styles(n_iter=25000, mode="append")
+    run_compare_styles(n_iter=25000, mode="cached")
