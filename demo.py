@@ -404,7 +404,7 @@ def run_compare_raters() -> None:
     print(corrs.round(3))
 
 
-def run_compare_styles(n_iter: int = 10000, mode: Literal["append", "overwrite"] = "append") -> None:
+def run_compare_styles(n_iter: int = 10000, mode: Literal["append", "overwrite", "cached"] = "cached") -> None:
     dfs = []
     STYLES = ["independent", "dependent"]
     DISTS = ["unif", "exp", "exp-r", "exp2", "exp2-r"]
@@ -430,10 +430,10 @@ def run_compare_styles(n_iter: int = 10000, mode: Literal["append", "overwrite"]
         )
     ]
 
-    if DF_OUT.exists() and CORRS_OUT.exists() and (not force):
+    if DF_OUT.exists() and CORRS_OUT.exists() and mode == "cached":
         df_all = pd.read_parquet(DF_OUT)
         c_all = pd.read_parquet(CORRS_OUT)
-    else:
+    elif mode == "overwrite":
         dfs, corrs = list(zip(*process_map(compare_error_styles, GRID, chunksize=1)))
         df_all = pd.concat(dfs, axis=0, ignore_index=True)
         corrs_all = pd.concat(corrs, axis=0, ignore_index=True)
@@ -443,6 +443,24 @@ def run_compare_styles(n_iter: int = 10000, mode: Literal["append", "overwrite"]
         )
         df_all.to_parquet(DF_OUT)
         c_all.to_parquet(CORRS_OUT)
+    elif DF_OUT.exists() and CORRS_OUT.exists() and mode == "append":
+        df_old = pd.read_parquet(DF_OUT)
+        c_old = pd.read_parquet(CORRS_OUT)
+
+        dfs, corrs = list(zip(*process_map(compare_error_styles, GRID, chunksize=1)))
+        df_all = pd.concat(dfs, axis=0, ignore_index=True)
+        corrs_all = pd.concat(corrs, axis=0, ignore_index=True)
+        c_all = pd.concat(
+            [df_all.loc[:, ["n_cls", "dist", "errors", "r", "s", "sr"]], corrs_all],
+            axis=1,
+        )
+
+        df_all = pd.concat([df_old, df_all], axis=0, ignore_index=True)
+        c_all = pd.concat([c_old, c_all ], axis=0, ignore_index=True)
+        df_all.to_parquet(DF_OUT)
+        c_all.to_parquet(CORRS_OUT)
+    else:
+        raise ValueError("Missing pre-computed tables.")
 
     sbn.set_style("darkgrid")
     grid = sbn.relplot(
