@@ -17,6 +17,7 @@ from irrCAC.raw import CAC
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from numpy import ndarray
+from numpy.random import Generator
 from numpy.typing import ArrayLike
 from pandas import DataFrame, Series
 from scipy.stats.contingency import association, crosstab
@@ -310,6 +311,37 @@ def compare_raters(args: Namespace) -> DataFrame:
     return pd.concat([extra, df], axis=1)
 
 
+def get_p(
+    dist: Literal["unif", "bimodal", "multimodal", "exp", "exp-r", "exp2", "exp2-r"],
+    n_classes: int,
+    rng: Generator,
+) -> ndarray:
+    if dist == "unif":
+        p = None
+    if dist == "bimodal":
+        extreme = n_classes / 2
+        p = np.ones([n_classes])
+        p[0] = p[-1] = extreme
+        p /= p.sum()
+    elif dist == "multimodal":
+        n_modes = rng.integers(0, n_classes)
+        extreme = n_classes / n_modes
+        p = np.ones([n_classes])
+        p[:n_modes] = extreme
+        p /= p.sum()
+    elif dist == "exp":
+        p = softmax(np.linspace(0, 1, n_classes))
+    elif dist == "exp-r":
+        p = softmax(list(reversed(np.linspace(0, 1, n_classes))))
+    elif dist == "exp2":
+        p = softmax(np.exp(np.linspace(0, 1, n_classes)))
+    elif dist == "exp2-r":
+        p = softmax(list(reversed(np.exp(np.linspace(0, 1, n_classes)))))
+    else:
+        raise ValueError()
+    return p
+
+
 def compare_error_styles(args: Namespace) -> Tuple[DataFrame, DataFrame]:
     """Compare ECs and Kappa-based agreement where errors are generated in two ways
 
@@ -331,29 +363,18 @@ def compare_error_styles(args: Namespace) -> Tuple[DataFrame, DataFrame]:
     filterwarnings("ignore", category=RuntimeWarning)
     r = args.r  # value in [0, 1]
     s = args.err_size  # value in [0, 1]
-    dist = args.dist
+    edist = args.edist
+    ydist = args.ydist
     error_style = args.errors
     n_classes = args.n_classes
     rng = np.random.default_rng(seed=args.seed)
 
     CLASSES = list(range(n_classes))
-    dist_unif = sorted(softmax(rng.uniform(0, 1, n_classes)))
-    y = rng.choice(CLASSES, size=N, p=dist_unif)  # y_true
+    y = rng.choice(CLASSES, size=N, p=get_p(ydist, n_classes, rng))  # y_true
     ys = [y.copy() for _ in range(5)]
     n_max_err = ceil(s * len(y))
     err_max_idx = rng.permutation(len(y))[:n_max_err]
-    if dist == "unif":
-        p = None
-    elif dist == "exp":
-        p = softmax(np.linspace(0, 1, n_classes))
-    elif dist == "exp-r":
-        p = softmax(list(reversed(np.linspace(0, 1, n_classes))))
-    elif dist == "exp2":
-        p = softmax(np.exp(np.linspace(0, 1, n_classes)))
-    elif dist == "exp2-r":
-        p = softmax(list(reversed(np.exp(np.linspace(0, 1, n_classes)))))
-    else:
-        raise ValueError()
+    p = get_p(edist, n_classes, rng)
 
     y_errs = []
     idxs = []  # binary errors on error set only
@@ -402,7 +423,8 @@ def compare_error_styles(args: Namespace) -> Tuple[DataFrame, DataFrame]:
     extra = DataFrame(
         {
             "n_cls": n_classes,
-            "dist": dist,
+            "edist": edist,
+            "ydist": ydist,
             "errors": error_style,
             "r": r,
             "s": s,
@@ -477,7 +499,8 @@ def get_df(
                     "n_classes": list(range(2, 50)),
                     # "n_classes": list(range(2, 5)),
                     "errors": STYLES,
-                    "dist": DISTS,
+                    "edist": DISTS,
+                    "ydist": DISTS,
                     "r": uniform(),
                     "err_size": uniform(),
                     "reps": list(range(N_REP)),
@@ -611,6 +634,7 @@ def scatter_grid(
     hue: Optional[str] = "r",
     size: Optional[str] = "n_cls",
     show: bool = False,
+    **kwargs,
 ) -> None:
     sbn.set_style("darkgrid")
     renames = {
@@ -628,9 +652,15 @@ def scatter_grid(
     x = renames[x] if x in renames else x
     y = renames[y] if y in renames else y
     hue = renames[hue] if hue in renames else hue
-    if row is None:
+    if row == col:
+        raise ValueError(
+            "Cannot have `row` == `col`, will cause very inscrutable errors."
+        )
+    if row is None and col is not None:
         corrs = df.groupby(col)[x].corr(df[y])
-    else:
+    elif row is not None and col is None:
+        corrs = df.groupby(row)[x].corr(df[y])
+    elif row is not None and col is not None:
         corrs = df.groupby([row, col])[x].corr(df[y])
 
     grid = sbn.relplot(
@@ -646,6 +676,7 @@ def scatter_grid(
         # palette="crest",
         palette="flare",
         size=renames[size] if size in renames else size,
+        **kwargs,
     )
     fig: Figure = plt.gcf()
     if hue is not None:
@@ -688,8 +719,9 @@ def run_compare_styles(
         df=df,
         x="a_mean",
         y="ec_g",
-        row="errors",
-        hue="max_cls",
+        # col=None,
+        col="errors",
+        hue="mean_cls",
         title="EC (local) vs. Mean Accuracy (by dependence)",
         show=True,
     )
@@ -719,5 +751,5 @@ def run_compare_styles(
 if __name__ == "__main__":
     # run_compare_raters()
     # run_compare_styles(n_iter=25000, mode="append")
-    run_compare_styles(n_iter=50000, mode="cached")
-    # run_compare_styles(n_iter=50000, mode="overwrite")
+    # run_compare_styles(n_iter=50000, mode="cached")
+    run_compare_styles(n_iter=100_000, mode="overwrite")
