@@ -772,5 +772,5 @@ def run_compare_styles(
 if __name__ == "__main__":
     # run_compare_raters()
     # run_compare_styles(n_iter=25000, mode="append")
-    run_compare_styles(n_iter=100_000, mode="cached")
-    # run_compare_styles(n_iter=100_000, mode="overwrite", compute_only=True)
+    # run_compare_styles(n_iter=100_000, mode="cached")
+    run_compare_styles(n_iter=100_000, mode="overwrite", compute_only=True)
