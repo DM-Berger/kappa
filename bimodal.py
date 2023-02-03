@@ -35,14 +35,13 @@ def softmax(x: ArrayLike) -> ndarray:
     return np.exp(x) / np.sum(np.exp(x))
 
 
-if __name__ == "__main__":
-    # n_modes = 3
+def sim_manual_dists() -> None:
     for dist in ["unif", "bimodal", "exp", "exp-r", "exp2", "exp2-r"]:
         fig, axes = plt.subplots(ncols=5, nrows=2, sharey=True, sharex=False)
         for n_classes, ax in zip([5, 10, 15, 20, 25, 30, 35, 40, 45, 50], axes.flat):
             if dist == "unif":
                 p = None
-            if dist == "bimodal":
+            elif dist == "bimodal":
                 extreme = n_classes / 2
                 p = np.ones([n_classes])
                 p[0] = p[-1] = extreme
@@ -55,12 +54,20 @@ if __name__ == "__main__":
                 p /= p.sum()
             elif dist == "exp":
                 p = softmax(np.linspace(0, 1, n_classes))
+                p = np.linspace(0, 1, n_classes)
+                p /= p.sum()
             elif dist == "exp-r":
                 p = softmax(list(reversed(np.linspace(0, 1, n_classes))))
+                p = list(reversed(np.linspace(0, 1, n_classes)))
+                p = np.array(p) / np.sum(p)
             elif dist == "exp2":
                 p = softmax(np.exp(np.linspace(0, 1, n_classes)))
+                p = np.exp(np.exp(np.exp(np.linspace(0, 1, n_classes))))
+                p /= p.sum()
             elif dist == "exp2-r":
                 p = softmax(list(reversed(np.exp(np.linspace(0, 1, n_classes)))))
+                p = np.exp(np.array(list(reversed(np.exp(np.linspace(0, 1, n_classes))))))
+                p /= p.sum()
             ax.hist(
                 np.random.choice(list(range(n_classes)), size=1000, p=p), bins=n_classes
             )
@@ -68,3 +75,78 @@ if __name__ == "__main__":
         fig.set_size_inches(w=16, h=10)
         plt.show(block=False)
     plt.show()
+
+
+def sim_beta_dists() -> None:
+    rng = np.random.default_rng()
+    for n_classes in [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]:
+        fig, axes = plt.subplots(nrows=4, ncols=4, sharex=True, sharey=True)
+        for ax in axes.flat:
+            alpha = rng.uniform(1e-5, 10)
+            beta = rng.uniform(1e-5, 10)
+            p = rng.beta(alpha, beta, size=n_classes)
+            p /= p.sum()
+            p = sorted(p)
+            ax.hist(
+                np.random.choice(list(range(n_classes)), size=1000, p=p),
+                bins=n_classes,
+                color="black",
+            )
+            ax.set_title(f"a={alpha:03f}, b={beta:03f}")
+        fig.set_size_inches(w=16, h=10)
+        fig.suptitle(f"n_classes={n_classes}")
+        fig.tight_layout()
+        plt.show(block=False)
+    plt.show()
+
+
+def sim_beta_dist(kind="bimodal") -> None:
+    rng = np.random.default_rng()
+    n_classes = 25
+    fig, axes = plt.subplots(nrows=5, ncols=8, sharex=True, sharey=True)
+    for ax in axes.flat:
+        if kind == "bimodal":
+            alpha = beta = rng.uniform(1e-5, 10)
+            # beta = rng.uniform(1e-5, 0.5)
+        else:
+            alpha = rng.uniform(1e-5, 10)
+            beta = rng.uniform(1e-5, 10)
+        p = rng.beta(alpha, beta, size=n_classes)
+        p /= p.sum()
+        p = -np.sort(-p)
+        ax.hist(
+            np.random.choice(list(range(n_classes)), size=1000, p=p),
+            bins=n_classes,
+            color="black",
+        )
+        ax.set_title(f"a={alpha:.3f}, b={beta:.3f}")
+    fig.set_size_inches(w=16, h=10)
+    fig.suptitle(f"n_classes={n_classes}")
+    fig.tight_layout()
+    plt.show()
+
+
+def sim_exp_dist() -> None:
+    rng = np.random.default_rng()
+    n_classes = 5
+    fig, axes = plt.subplots(nrows=5, ncols=8, sharex=True, sharey=True)
+    for ax in axes.flat:
+        scale = rng.uniform(1 / 10, 20)
+        p = np.linspace(0, 1, n_classes) ** scale
+        p /= p.sum()
+        p = -np.sort(-p)
+        ax.hist(
+            np.random.choice(list(range(n_classes)), size=1000, p=p),
+            bins=n_classes,
+            color="black",
+        )
+        ax.set_title(f"scale={scale:.3f}")
+    fig.set_size_inches(w=16, h=10)
+    fig.suptitle(f"n_classes={n_classes}")
+    fig.tight_layout()
+    plt.show()
+
+
+if __name__ == "__main__":
+    # sim_beta_dist(None)
+    sim_exp_dist()

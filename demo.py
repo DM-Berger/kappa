@@ -264,83 +264,39 @@ def get_stats(
     return means, corrs
 
 
-def compare_raters(args: Namespace) -> DataFrame:
-    raters = args.raters
-    strength = args.strength
-    n_classes = args.n_classes
-    corr_strength = CORR_STRENGTHS[strength]
-
-    # DIST = [N_CLASSES - 0.5 * n for n in range(N_CLASSES)]
-    DIST_EXP = sorted(softmax(np.random.standard_exponential(n_classes)))
-    DIST_UNIF = sorted(softmax(np.random.uniform(0, 1, n_classes)))
-    DIST_STD = sorted(softmax(np.random.standard_normal(n_classes)))
-
-    DIST1 = DIST_UNIF
-    DIST2 = DIST_UNIF if raters == "same" else DIST_EXP
-    DIST3 = DIST_UNIF if raters == "same" else DIST_STD
-
-    CLASSES = list(range(n_classes))
-
-    y = np.random.choice(CLASSES, size=N, p=DIST1)
-    y1 = y.copy()
-    y2 = y.copy()
-    y3 = y.copy()
-
-    if raters == "non-random":
-        errs = np.random.choice(CLASSES, size=len(y1[::4]), p=DIST_UNIF)
-        y1_errs = errs
-        y2_errs = errs + np.random.choice(
-            [-1, 0, 1], p=corr_strength, size=len(errs)
-        )  # correlated
-        y3_errs = errs + np.random.choice(
-            [-1, 0, 1], p=corr_strength, size=len(errs)
-        )  # correlated
-        y2_errs = np.clip(y2_errs, a_min=np.min(CLASSES), a_max=np.max(CLASSES))
-        y3_errs = np.clip(y3_errs, a_min=np.min(CLASSES), a_max=np.max(CLASSES))
-    else:
-        y1_errs = np.random.choice(CLASSES, size=len(y1[::4]), p=DIST1)
-        y2_errs = np.random.choice(CLASSES, size=len(y1[::4]), p=DIST2)
-        y3_errs = np.random.choice(CLASSES, size=len(y1[::4]), p=DIST3)
-
-    y1[::4] = y1_errs
-    y2[::4] = y2_errs
-    y3[::4] = y3_errs
-    ys = [y1, y2, y3]
-    y_errs = [y1_errs, y2_errs, y3_errs]
-    extra = DataFrame({"n_cls": n_classes, "raters": raters}, index=[0])
-    df, corrs = get_stats(y=y, ys=ys, y_errs=y_errs, n_classes=n_classes)
-    return pd.concat([extra, df], axis=1)
-
-
 def get_p(
-    dist: Literal["unif", "bimodal", "multimodal", "exp", "exp-r", "exp2", "exp2-r"],
+    dist: Literal[
+        "unif", "bimodal", "bimodal-r", "multimodal", "multimodal-r", "exp", "exp-r"
+    ],
     n_classes: int,
     rng: Generator,
     n_modes: Optional[int] = None,
 ) -> Tuple[Optional[ndarray], Optional[int]]:
     if dist == "unif":
-        p = None
-    elif dist == "bimodal":
+        return None, n_modes
+
+    if "bimodal" in dist:
         extreme = n_classes / 2
         p = np.ones([n_classes])
         p[0] = p[-1] = extreme
         p /= p.sum()
-    elif dist == "multimodal":
+        p = -np.sort(-p)
+    elif "multi" in dist:
         n_modes = rng.integers(0, min(n_classes, 10)) if n_modes is None else n_modes
         extreme = n_classes / n_modes
         p = np.ones([n_classes])
         p[:n_modes] = extreme
         p /= p.sum()
-    elif dist == "exp":
-        p = softmax(np.linspace(0, 1, n_classes))
-    elif dist == "exp-r":
-        p = softmax(list(reversed(np.linspace(0, 1, n_classes))))
-    elif dist == "exp2":
-        p = softmax(np.exp(np.linspace(0, 1, n_classes)))
-    elif dist == "exp2-r":
-        p = softmax(list(reversed(np.exp(np.linspace(0, 1, n_classes)))))
+        p = -np.sort(-p)
+    elif "exp" in dist:
+        scale = rng.uniform(1 / 10, 20)
+        p = np.linspace(0, 1, n_classes) ** scale
+        p /= p.sum()
+        p = -np.sort(-p)
     else:
         raise ValueError()
+    if "-r" in dist:
+        p = np.sort(p)
     return p, n_modes
 
 
@@ -443,58 +399,11 @@ def compare_error_styles(args: Namespace) -> Tuple[DataFrame, DataFrame]:
     return pd.concat([extra, df], axis=1), corrs
 
 
-def run_compare_raters() -> None:
-    dfs = []
-    RATERS = ["same", "diff", "non-random"]
-
-    GRID = [
-        Namespace(**args)
-        for args in ParameterGrid(
-            {
-                "raters": RATERS,
-                "strength": list(range(len(CORR_STRENGTHS))),
-                "n_classes": list(range(2, 50)),
-                "reps": list(range(N_REP)),
-            }
-        )
-    ]
-    GRID = list(
-        filter(lambda g: not ((g.raters != "non-random") and (g.strength > 0)), GRID)
-    )
-
-    dfs = process_map(compare_raters, GRID, chunksize=1)
-
-    df_all = pd.concat(dfs, axis=0, ignore_index=True)
-    dists = pd.get_dummies(df_all["raters"])
-    df = pd.concat(
-        [
-            df_all.loc[:, "n_cls"].to_frame(),
-            dists,
-            df_all.drop(columns=["raters", "n_cls"]),
-        ],
-        axis=1,
-    )
-    # n_cols = len(df.columns)
-    # fmt = ["0.3f" for _ in range(n_cols + 1)]
-    # fmt[0] = "0.0f"
-    # print(df.to_markdown(tablefmt="simple", floatfmt=fmt, index=False))
-    pd.options.display.max_rows = 1000
-    print(df_all.groupby("raters").describe().round(3).T)
-    # print("EC / acc_mean correlation:", df.ec_q.corr(df.acc_mean))
-    # print("EC / Kappa_y correlation:", df.ec.corr(df.k_y))
-    # print("EC / Kappa_e correlation:", df.ec.corr(df.k_e))
-    # print(df_all.groupby("raters").corr("pearson").round(3))
-    # corrs = df.corr("pearson")
-    print(df_all.groupby("raters").corr("pearson").round(3))
-    corrs = df.corr("pearson")
-    print(corrs.round(3))
-
-
 def get_df(
     n_iter: int = 25000, mode: Literal["append", "overwrite", "cached"] = "cached"
 ) -> DataFrame:
     STYLES = ["independent", "dependent"]
-    DISTS = ["unif", "bimodal", "multimodal", "exp", "exp-r", "exp2", "exp2-r"]
+    DISTS = ["unif", "bimodal", "multimodal", "exp", "exp-r"]
     ss = np.random.SeedSequence()
     seeds = ss.spawn(n_iter)
 
@@ -608,12 +517,12 @@ def print_descriptions(df: DataFrame) -> None:
     print(cg.round(3))
     corrs = df.corr("pearson")
     print(corrs.round(3))
-    cols = list(filter(lambda c: "ec" in c, cg.columns))
+    cols = list(filter(lambda c: "ec" in c, cg.columns))  # type: ignore
     print("EC correlations taking into account distributions")
     for col in cols:
         print("\n", col.upper())
         print(cg[col].unstack().round(3).T)
-    cols = list(filter(lambda c: "K" in c, cg.columns))
+    cols = list(filter(lambda c: "K" in c, cg.columns))  # type: ignore
     print("Kappa correlations taking into account distributions")
     for col in cols:
         print("\n", col.upper())
@@ -626,13 +535,13 @@ def print_descriptions(df: DataFrame) -> None:
     print(cg.round(3))
     corrs = df.corr("pearson")
     print(corrs.round(3))
-    cols = list(filter(lambda c: "ec" in c, cg.columns))
+    cols = list(filter(lambda c: "ec" in c, cg.columns))  # type: ignore
     print("EC correlations ignoring distributions")
     for col in cols:
         print("\n", col.upper())
         print(cg[col].unstack().round(3).T)
 
-    cols = list(filter(lambda c: "K" in c, cg.columns))
+    cols = list(filter(lambda c: "K" in c, cg.columns))  # type: ignore
     print("Kappa correlations ignoring distributions")
     for col in cols:
         print("\n", col.upper())
@@ -688,11 +597,11 @@ def scatter_grid(
             "Cannot have `row` == `col`, will cause very inscrutable errors."
         )
     if row is None and col is not None:
-        corrs = df.groupby(col)[x].corr(df[y])
+        corrs = df.groupby(col)[x].corr(df[y])  # type: ignore
     elif row is not None and col is None:
-        corrs = df.groupby(row)[x].corr(df[y])
+        corrs = df.groupby(row)[x].corr(df[y])  # type: ignore
     elif row is not None and col is not None:
-        corrs = df.groupby([row, col])[x].corr(df[y])
+        corrs = df.groupby([row, col])[x].corr(df[y])  # type: ignore
 
     grid = sbn.relplot(
         data=df,
@@ -729,9 +638,9 @@ def scatter_grid(
         edist = ax.get_title().split(" ")[-1]
         if row is not None and col is not None:
             ydist = ax.get_title().split(" |")[0].split(" ")[-1]
-            r = f"(Pearson's r={corrs[edist][ydist].round(3)})"
+            r = f"(Pearson's r={corrs[edist][ydist].round(3)})"  # type: ignore
         else:
-            r = f"(Pearson's r={corrs[edist].round(3)})"
+            r = f"(Pearson's r={corrs[edist].round(3)})"  # type: ignore
         ax.set_title(f"{ax.get_title()}\n{r}")
     fig.tight_layout()
     fig.subplots_adjust(right=0.85)
@@ -773,22 +682,24 @@ def run_compare_styles(
 
     # least related to dependence are e_ebv, e_corr or ec_r, e_v, and finally K
 
-    args = list(ParameterGrid(
-        dict(
-            df=[df],
-            x=["a_mean"],
-            y=METRICS,
-            col=["edist"],
-            col_order=[DIST_ORDER],
-            row=["ydist"],
-            row_order=[DIST_ORDER],
-            markers=["errors"],
-            hue=["mean_cls"],
-            dependence=["dependent", "independent"],  # type: ignore
-            outdirname=["by_dist"],
-            show=[False],
+    args = list(
+        ParameterGrid(
+            dict(
+                df=[df],
+                x=["a_mean"],
+                y=METRICS,
+                col=["edist"],
+                col_order=[DIST_ORDER],
+                row=["ydist"],
+                row_order=[DIST_ORDER],
+                markers=["errors"],
+                hue=["mean_cls"],
+                dependence=["dependent", "independent"],  # type: ignore
+                outdirname=["by_dist"],
+                show=[False],
+            )
         )
-    ))
+    )
     # process_map(scatter_grid_p, args)
 
     # plot relation to mean class probability
@@ -849,5 +760,5 @@ def run_compare_styles(
 if __name__ == "__main__":
     # run_compare_raters()
     # run_compare_styles(n_iter=25000, mode="append")
-    run_compare_styles(n_iter=100_000, mode="cached")
-    # run_compare_styles(n_iter=100_000, mode="overwrite", compute_only=True)
+    # run_compare_styles(n_iter=100_000, mode="cached")
+    run_compare_styles(n_iter=100_000, mode="overwrite", compute_only=True)
