@@ -63,6 +63,13 @@ def ec(y: ndarray, y1: ndarray, y2: ndarray) -> float:
     return np.mean((y1 != y) == (y2 != y))
 
 
+def eci(y: ndarray, y1: ndarray, y2: ndarray) -> float:
+    e1 = y1 != y
+    e2 = y2 != y
+    inter = e1 & e2
+    return float(np.sum(inter) / len(y))
+
+
 def ec_local(y: ndarray, y1: ndarray, y2: ndarray) -> float:
     e1 = y1 != y
     e2 = y2 != y
@@ -119,8 +126,8 @@ def get_stats(
     es = [y != yy for yy in ys]
     y_combs = list(combinations(ys, 2))
     e_combs = list(combinations(es, 2))
-    y_tab = np.stack(ys, axis=1)
-    cac = CAC(DataFrame(y_tab), categories=list(range(n_classes)))
+    # y_tab = np.stack(ys, axis=1)
+    # cac = CAC(DataFrame(y_tab), categories=list(range(n_classes)))
 
     # "b" for binary / boolean ,e.g. operates on binary error residuals
     e_corrs = [np.corrcoef(*comb)[0, 1] for comb in y_combs]
@@ -146,28 +153,30 @@ def get_stats(
     accs = [acc(y, yy) for yy in ys]
 
     ec_rs = [np.corrcoef(*comb)[0, 1] for comb in y_combs]
-    ec_brs = [np.corrcoef(*comb)[0, 1] for comb in e_combs]
+    # ec_brs = [np.corrcoef(*comb)[0, 1] for comb in e_combs]
     ec_gs = [ec(y, *comb) for comb in y_combs]
+    ec_gis = [eci(y, *comb) for comb in y_combs]
     ecls = [ec_local(y, *comb) for comb in y_combs]
     ecus = [ec_union(y, *comb) for comb in y_combs]
     unions = [ecu * N for ecu in ecus]
     Cs = [confusion(y, yy, labels=list(range(n_classes))) for yy in ys]
-    C_12_accs = [np.mean(C1 == C2) for C1, C2 in combinations(Cs, 2)]
+    # C_12_accs = [np.mean(C1 == C2) for C1, C2 in combinations(Cs, 2)]
     ks = [kappa(*comb) for comb in y_combs]
     kys = [kappa(y, yy) for yy in ys]
 
     ec_r = np.mean(ec_rs)
-    ec_br = np.mean(ec_brs)
+    # ec_br = np.mean(ec_brs)
     ec_g = np.mean(ec_gs)
     ecl = np.mean(ecls)
-    ecu = np.mean(ecus)
-    ec_mx, mx = ec_max(y, ys)
-    C_12_acc = np.mean(C_12_accs)
+    # ecu = np.mean(ecus)
+    # ec_mx, mx = ec_max(y, ys)
+    # C_12_acc = np.mean(C_12_accs)
 
     # distributional stats
     amean, arange, arrange, _, _ = get_desc(accs)
     kmean, krange, krrange, kmax, kmin = get_desc(ks)
     ecg_mean, ecg_range, ecg_rrange, ecg_max, ecg_min = get_desc(ec_gs)
+    ecgi_mean, ecgi_range, ecgi_rrange, ecgi_max, ecgi_min = get_desc(ec_gis)
     ecl_mean, ecl_range, ecl_rrange, ecl_max, ecl_min = get_desc(ecls)
     umean, urange, _, umax, umin = get_desc(unions)
 
@@ -180,20 +189,21 @@ def get_stats(
             "e_bv": e_bv,
             "e_sbv": e_sbv,  # type: ignore
             "a_mean": amean,
-            "union_max": mx,
+            "union_max": umax,
             # "C_12_acc": C_12_acc,
             "ec_r": ec_r,
             # "ec_br": ec_br,
             "ec_g": ec_g,
+            "ec_gi": ecgi_mean,
             # "ec_gu": ecu,
             # "ec_max": ec_mx,
             "ec_l": ecl,
-            "ec_g*acc": ec_g * amean,
+            # "ec_g*acc": ec_g * amean,
             # "ec_g/acc": ec_y / amean,
-            "ec_l*acc": ecl * amean,
+            # "ec_l*acc": ecl * amean,
             # "ec_l/acc": ecl / amean,
-            "alpha": cac.krippendorff()["est"]["coefficient_value"],
-            "ac2": cac.gwet()["est"]["coefficient_value"],
+            # "alpha": cac.krippendorff()["est"]["coefficient_value"],
+            # "ac2": cac.gwet()["est"]["coefficient_value"],
             "K": kmean,
         },
         index=[0],
@@ -211,6 +221,10 @@ def get_stats(
             "ecg_rrng": ecg_rrange,
             "ecg_mx": ecg_max,
             "ecg_mn": ecg_min,
+            "ecgi_rng": ecgi_range,
+            "ecgi_rrng": ecgi_rrange,
+            "ecgi_mx": ecgi_max,
+            "ecgi_mn": ecgi_min,
             "ecl_rng": ecl_range,
             "ecl_rrng": ecl_rrange,
             "ecl_mx": ecl_max,
@@ -573,6 +587,7 @@ def scatter_grid(
     row: Optional[str] = None,
     hue: Optional[str] = "r",
     size: Optional[str] = "n_cls",
+    show: bool = False,
 ) -> None:
     sbn.set_style("darkgrid")
     renames = {
@@ -615,6 +630,8 @@ def scatter_grid(
         ax.set_title(f"{ax.get_title()}\n{r}")
     fig.tight_layout()
     fig.subplots_adjust(right=0.85)
+    if show:
+        return plt.show()
     outname = title.replace(" ", "_")
     outname = re.sub(r"[^a-zA-Z\d_]", "", outname)
     outfile = PLOTS / f"{outname}.png"
@@ -627,17 +644,31 @@ def run_compare_styles(
 ) -> None:
     df = get_df(n_iter=n_iter, mode=mode)
     # print_descriptions(df)
-    scatter_grid(df=df, x="a_mean", y="K", title="Cohen's Kappa vs. Mean Accuracy")
+    # scatter_grid(df=df, x="a_mean", y="K", title="Cohen's Kappa vs. Mean Accuracy")
+    # scatter_grid(
+    #     df=df, x="a_mean", y="alpha", title="Krippendorf's Alpha vs. Mean Accuracy"
+    # )
+    # scatter_grid(df=df, x="a_mean", y="ec_g", title="EC (global) vs. Mean Accuracy"
     scatter_grid(
-        df=df, x="a_mean", y="alpha", title="Krippendorf's Alpha vs. Mean Accuracy"
+        df=df,
+        x="a_mean",
+        y="ec_l",
+        hue="r",
+        title="EC (local) vs. Mean Accuracy (by dependence)",
+        show=True,
     )
-    scatter_grid(df=df, x="a_mean", y="ec_g", title="EC (global) vs. Mean Accuracy")
-    scatter_grid(df=df, x="a_mean", y="ec_l", title="EC (local) vs. Mean Accuracy")
-    scatter_grid(df=df, x="a_mean", y="e_v", title="Cramer's V vs. Mean Accuracy")
-    scatter_grid(df=df, x="ec_g", y="ec_l", title="EC (global) vs. EC (local)")
+    scatter_grid(
+        df=df,
+        x="a_mean",
+        y="ec_l",
+        hue="s",
+        title="EC (local) vs. Mean Accuracy (by size)",
+    )
+    # scatter_grid(df=df, x="a_mean", y="e_v", title="Cramer's V vs. Mean Accuracy")
+    # scatter_grid(df=df, x="ec_g", y="ec_l", title="EC (global) vs. EC (local)")
 
 
 if __name__ == "__main__":
     # run_compare_raters()
     # run_compare_styles(n_iter=25000, mode="append")
-    run_compare_styles(n_iter=25000, mode="cached")
+    run_compare_styles(n_iter=50000, mode="overwrite")
