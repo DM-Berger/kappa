@@ -318,7 +318,7 @@ def get_p(
 ) -> ndarray:
     if dist == "unif":
         p = None
-    if dist == "bimodal":
+    elif dist == "bimodal":
         extreme = n_classes / 2
         p = np.ones([n_classes])
         p[0] = p[-1] = extreme
@@ -487,7 +487,7 @@ def get_df(
     n_iter: int = 25000, mode: Literal["append", "overwrite", "cached"] = "cached"
 ) -> DataFrame:
     STYLES = ["independent", "dependent"]
-    DISTS = ["unif", "exp", "exp-r", "exp2", "exp2-r"]
+    DISTS = ["unif", "bimodal", "multimodal", "exp", "exp-r", "exp2", "exp2-r"]
     ss = np.random.SeedSequence()
     seeds = ss.spawn(n_iter)
 
