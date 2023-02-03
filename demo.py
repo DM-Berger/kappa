@@ -701,9 +701,13 @@ def scatter_grid(
 
 
 def run_compare_styles(
-    n_iter: int = 25000, mode: Literal["append", "overwrite", "cached"] = "cached"
+    n_iter: int = 25000,
+    mode: Literal["append", "overwrite", "cached"] = "cached",
+    compute_only: bool = False,
 ) -> None:
     df = get_df(n_iter=n_iter, mode=mode)
+    if compute_only:
+        return
     # print_descriptions(df)
     # scatter_grid(df=df, x="a_mean", y="K", title="Cohen's Kappa vs. Mean Accuracy")
     # scatter_grid(
@@ -752,4 +756,4 @@ if __name__ == "__main__":
     # run_compare_raters()
     # run_compare_styles(n_iter=25000, mode="append")
     # run_compare_styles(n_iter=50000, mode="cached")
-    run_compare_styles(n_iter=100_000, mode="overwrite")
+    run_compare_styles(n_iter=100_000, mode="overwrite", compute_only=True)
