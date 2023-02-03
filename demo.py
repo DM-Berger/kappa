@@ -40,6 +40,7 @@ def ensure_dir(path: Path) -> Path:
 ROOT = Path(__file__).resolve().parent
 PLOTS = ensure_dir(ROOT / "plots")
 
+DIST_ORDER = ["unif", "exp", "exp-r", "exp2", "exp2-r", "multimodal", "bimodal"]
 CORR_STRENGTHS = [((1 - 0.1 * p) / 2, 0.1 * p, (1 - 0.1 * p) / 2) for p in range(11)]
 N = 1000
 N_REP = 20
@@ -650,6 +651,7 @@ def scatter_grid(
     hue: Optional[str] = "r",
     size: Optional[str] = "n_cls",
     dependence: Optional[Literal["both", "dependent", "independent"]] = None,
+    outdirname: Optional[str] = None,
     show: bool = False,
     **kwargs,
 ) -> None:
@@ -657,6 +659,7 @@ def scatter_grid(
     renames = {
         "a_mean": "acc_mean",
         "K": "kappa",
+        "mean_cls": "Avg. Class Prob",
         "alpha": "Krippendorf's alpha",
         "ec_g": "EC (global)",
         "ec_l": "EC (local)",
@@ -738,10 +741,15 @@ def scatter_grid(
         title = suptitle
     outname = title.replace(" ", "_")
     outname = re.sub(r"[^a-zA-Z\d_]", "", outname)
-    outfile = PLOTS / f"{outname}.png"
+    outdir = PLOTS if outdirname is None else ensure_dir(PLOTS / outdirname)
+    outfile = outdir / f"{outname}.png"
     plt.savefig(outfile, dpi=200)
     plt.close()
     print(f"Saved plot to {outfile}")
+
+
+def scatter_grid_p(args: Dict[str, Any]) -> None:
+    return scatter_grid(**args)
 
 
 def run_compare_styles(
@@ -752,6 +760,7 @@ def run_compare_styles(
     df = get_df(n_iter=n_iter, mode=mode)
     if compute_only:
         return
+    METRICS = ["ec_g", "ec_gi", "ec_l", "K", "e_v", "e_corr"]
     # print_descriptions(df)
     # scatter_grid(df=df, x="a_mean", y="K", title="Cohen's Kappa vs. Mean Accuracy")
     # scatter_grid(
@@ -763,34 +772,69 @@ def run_compare_styles(
     # df.groupby("errors").corr()["a_mean"].abs().sort_values()
 
     # least related to dependence are e_ebv, e_corr or ec_r, e_v, and finally K
-    for metric in ["ec_g", "ec_gi", "ec_l", "K", "e_v", "e_corr"]:
-        for dependence in ["dependent", "independent"]:
-            scatter_grid(
-                df=df,
-                x="a_mean",
-                y=metric,
-                # col=None,
-                col="edist",
-                row="ydist",
-                markers="errors",
-                hue="mean_cls",
-                dependence=dependence,  # type: ignore
-                # title="EC (local) vs. Mean Accuracy (by dependence)",
-                show=False,
+
+    args = list(ParameterGrid(
+        dict(
+            df=[df],
+            x=["a_mean"],
+            y=METRICS,
+            col=["edist"],
+            col_order=[DIST_ORDER],
+            row=["ydist"],
+            row_order=[DIST_ORDER],
+            markers=["errors"],
+            hue=["mean_cls"],
+            dependence=["dependent", "independent"],  # type: ignore
+            outdirname=["by_dist"],
+            show=[False],
+        )
+    ))
+    # process_map(scatter_grid_p, args)
+
+    # plot relation to mean class probability
+    args = list(
+        ParameterGrid(
+            dict(
+                df=[df],
+                x=["mean_cls"],
+                y=METRICS,
+                col=["errors"],
+                col_order=[["independent", "dependent"]],
+                # col="acc",
+                # col_order=["<33%", "33%-66%", ">66%"],
+                hue=["r"],
+                size=["a_mean"],
+                outdirname=["by_dependency"],
+                show=[False],
             )
+        )
+    )
+    # process_map(scatter_grid_p, args)
+
+    dfsmall = df[df["n_cls"] < 10]
+    args = list(
+        ParameterGrid(
+            dict(
+                df=[dfsmall],
+                x=["a_mean"],
+                y=METRICS,
+                col=["edist"],
+                col_order=[DIST_ORDER],
+                row=["ydist"],
+                row_order=[DIST_ORDER],
+                markers=["errors"],
+                hue=["mean_cls"],
+                dependence=["dependent", "independent"],  # type: ignore
+                outdirname=["few_classes"],
+                show=[False],
+            )
+        )
+    )
+    process_map(scatter_grid_p, args)
     return
 
-    scatter_grid(
-        df=df,
-        x="a_mean",
-        y="ec_g",
-        row="errors",
-        col="acc",
-        col_order=["<33%", "33%-66%", ">66%"],
-        hue="mean_cls",
-        title="EC (local) vs. Mean Accuracy (by dependence)",
-        show=True,
-    )
+    # look at small number of classes only
+
     scatter_grid(
         df=df,
         x="a_mean",
@@ -805,5 +849,5 @@ def run_compare_styles(
 if __name__ == "__main__":
     # run_compare_raters()
     # run_compare_styles(n_iter=25000, mode="append")
-    # run_compare_styles(n_iter=100_000, mode="cached")
-    run_compare_styles(n_iter=100_000, mode="overwrite", compute_only=True)
+    run_compare_styles(n_iter=100_000, mode="cached")
+    # run_compare_styles(n_iter=100_000, mode="overwrite", compute_only=True)
