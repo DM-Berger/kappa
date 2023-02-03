@@ -121,9 +121,51 @@ this naturally handles multi-class problems, interpretation is highly dubious,
 as we should in general expect strong dependency among predictions, which
 violates a core assumption of Cohen's $\kappa$.
 
+**Accuracy-Based Prediction Agreement (PA_acc)**
+
+$$\begin{align*}
+\text{PA}_{\kappa} &= \text{acc}(\symbfit{y}_i, \symbfit{y}_j) \\
+&= \text{mean}(\symbfit{y}_i = \symbfit{y}_j) \\
+\end{align*}$$
+
 **Note**: I also tested **Cramer's V**, **Krippendorf's** $\alpha$, and Gwet's
 **AC1/2**, but they show largely identical behaviour to $\kappa$, and so are
 not discussed further.
 
 
+## Metric Evaluation
+
+No classifiers need actually be fit to examine the general behaviour of these
+metrics.
+
+Given a classifier $f$, repeated trainings and evaluations will yield a number
+of predictions on some test set with correct labels $\symbfit{y}$ shared across
+evaluations. Across repeats, there will be a **maximum error set size** $s \in
+[0, 1]$ which is the largest proportion of test samples for which there is an
+erroneous prediction (i.e. at least $1 - s$ samples are always classified
+correctly).
+
+The maximum error set could be:
+
+- **Fixed**: Errors, if they occur, occur always on the same subset of the test
+  set, i.,e. always on the same indices of $\symbfit{y}$
+- **Variable**: Errors never exceed $s$ proportion of test samples, but are
+  not restricted to a particular subset of test samples
+
+
+In addition, errors can be:
+
+- **Independent**: The predictions $\symbfit{y}_i$ and $\symbfit{y}_j$ are
+  independent for all repeats $i \ne j$
+- **Dependent**: All predictions depend on (are partly determined by) some
+  source prediction $\symbfit{y}_{\text{base}}$, which may or not be similar
+  to the true labels $\symbfit{y}$
+
+Finally, both the true labels and predicted labels can have different distributions.
+Without loss of generality, for $c$ classes, we can sort the **class probabilities** :
+
+$$
+p = [p_1 \ge p_2 \ge \dots \ge p_c]
+$$
+The label distribution determines the kind of dataset
 

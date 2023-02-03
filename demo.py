@@ -703,41 +703,45 @@ def run_compare_styles(
     # process_map(scatter_grid_p, args)
 
     # plot relation to mean class probability
-    args = list(
-        ParameterGrid(
-            dict(
-                df=[df],
-                x=["mean_cls"],
-                y=METRICS,
-                col=["errors"],
-                col_order=[["independent", "dependent"]],
-                # col="acc",
-                # col_order=["<33%", "33%-66%", ">66%"],
-                hue=["r"],
-                size=["a_mean"],
-                outdirname=["by_dependency"],
-                show=[False],
+    args.extend(
+        list(
+            ParameterGrid(
+                dict(
+                    df=[df],
+                    x=["mean_cls"],
+                    y=METRICS,
+                    col=["errors"],
+                    col_order=[["independent", "dependent"]],
+                    # col="acc",
+                    # col_order=["<33%", "33%-66%", ">66%"],
+                    hue=["r"],
+                    size=["a_mean"],
+                    outdirname=["by_dependency"],
+                    show=[False],
+                )
             )
         )
     )
     # process_map(scatter_grid_p, args)
 
     dfsmall = df[df["n_cls"] < 10]
-    args = list(
-        ParameterGrid(
-            dict(
-                df=[dfsmall],
-                x=["a_mean"],
-                y=METRICS,
-                col=["edist"],
-                col_order=[DIST_ORDER],
-                row=["ydist"],
-                row_order=[DIST_ORDER],
-                markers=["errors"],
-                hue=["mean_cls"],
-                dependence=["dependent", "independent"],  # type: ignore
-                outdirname=["few_classes"],
-                show=[False],
+    args.extend(
+        list(
+            ParameterGrid(
+                dict(
+                    df=[dfsmall],
+                    x=["a_mean"],
+                    y=METRICS,
+                    col=["edist"],
+                    col_order=[DIST_ORDER],
+                    row=["ydist"],
+                    row_order=[DIST_ORDER],
+                    markers=["errors"],
+                    hue=["mean_cls"],
+                    dependence=["dependent", "independent"],  # type: ignore
+                    outdirname=["few_classes"],
+                    show=[False],
+                )
             )
         )
     )
