@@ -378,9 +378,9 @@ def compare_error_styles(args: Namespace) -> Tuple[DataFrame, DataFrame]:
     err_max_idx = rng.permutation(len(y))[:n_max_err]
     if ydist == "multimodal" and edist == "multimodal":
         # force same number of modes
-        p = get_p(edist, n_classes, rng, n_modes=n_modes)
+        p = get_p(edist, n_classes, rng, n_modes=n_modes)[0]
     else:
-        p = get_p(edist, n_classes, rng)
+        p = get_p(edist, n_classes, rng)[0]
 
     y_errs = []
     idxs = []  # binary errors on error set only
