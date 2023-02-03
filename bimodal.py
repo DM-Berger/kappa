@@ -64,7 +64,7 @@ if __name__ == "__main__":
             ax.hist(
                 np.random.choice(list(range(n_classes)), size=1000, p=p), bins=n_classes
             )
-            ax.set_title(f"n_classes={n_classes}")
+            ax.set_title(f"n_classes={n_classes}, dist={dist}")
         fig.set_size_inches(w=16, h=10)
         plt.show(block=False)
     plt.show()

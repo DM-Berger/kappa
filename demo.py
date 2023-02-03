@@ -315,7 +315,8 @@ def get_p(
     dist: Literal["unif", "bimodal", "multimodal", "exp", "exp-r", "exp2", "exp2-r"],
     n_classes: int,
     rng: Generator,
-) -> ndarray:
+    n_modes: Optional[int] = None,
+) -> Tuple[Optional[ndarray], Optional[int]]:
     if dist == "unif":
         p = None
     elif dist == "bimodal":
@@ -324,7 +325,7 @@ def get_p(
         p[0] = p[-1] = extreme
         p /= p.sum()
     elif dist == "multimodal":
-        n_modes = rng.integers(0, n_classes)
+        n_modes = rng.integers(0, min(n_classes, 10)) if n_modes is None else n_modes
         extreme = n_classes / n_modes
         p = np.ones([n_classes])
         p[:n_modes] = extreme
@@ -339,7 +340,7 @@ def get_p(
         p = softmax(list(reversed(np.exp(np.linspace(0, 1, n_classes)))))
     else:
         raise ValueError()
-    return p
+    return p, n_modes
 
 
 def compare_error_styles(args: Namespace) -> Tuple[DataFrame, DataFrame]:
@@ -370,11 +371,16 @@ def compare_error_styles(args: Namespace) -> Tuple[DataFrame, DataFrame]:
     rng = np.random.default_rng(seed=args.seed)
 
     CLASSES = list(range(n_classes))
-    y = rng.choice(CLASSES, size=N, p=get_p(ydist, n_classes, rng))  # y_true
+    yp, n_modes = get_p(ydist, n_classes, rng)
+    y = rng.choice(CLASSES, size=N, p=yp)  # y_true
     ys = [y.copy() for _ in range(5)]
     n_max_err = ceil(s * len(y))
     err_max_idx = rng.permutation(len(y))[:n_max_err]
-    p = get_p(edist, n_classes, rng)
+    if ydist == "multimodal" and edist == "multimodal":
+        # force same number of modes
+        p = get_p(edist, n_classes, rng, n_modes=n_modes)
+    else:
+        p = get_p(edist, n_classes, rng)
 
     y_errs = []
     idxs = []  # binary errors on error set only
@@ -521,7 +527,10 @@ def get_df(
         df_all = pd.concat(dfs, axis=0, ignore_index=True)
         corrs_all = pd.concat(corrs, axis=0, ignore_index=True)
         c_all = pd.concat(
-            [df_all.loc[:, ["n_cls", "edist", "ydist", "errors", "r", "s", "sr"]], corrs_all],
+            [
+                df_all.loc[:, ["n_cls", "edist", "ydist", "errors", "r", "s", "sr"]],
+                corrs_all,
+            ],
             axis=1,
         )
         df_all.to_parquet(DF_OUT)
@@ -534,7 +543,10 @@ def get_df(
         df_all = pd.concat(dfs, axis=0, ignore_index=True)
         corrs_all = pd.concat(corrs, axis=0, ignore_index=True)
         c_all = pd.concat(
-            [df_all.loc[:, ["n_cls", "edist", "ydist", "errors", "r", "s", "sr"]], corrs_all],
+            [
+                df_all.loc[:, ["n_cls", "edist", "ydist", "errors", "r", "s", "sr"]],
+                corrs_all,
+            ],
             axis=1,
         )
 
@@ -546,7 +558,11 @@ def get_df(
         raise ValueError("Missing pre-computed tables.")
 
     df = pd.concat(
-        [df_all, c_all.drop(columns=["n_cls", "edist", "ydist", "errors", "r", "s", "sr"])], axis=1
+        [
+            df_all,
+            c_all.drop(columns=["n_cls", "edist", "ydist", "errors", "r", "s", "sr"]),
+        ],
+        axis=1,
     )
     # correct the different meaning of "r" in the two cases
     inds = df["errors"] == "independent"
@@ -633,6 +649,7 @@ def scatter_grid(
     row_order: Optional[List[str]] = None,
     hue: Optional[str] = "r",
     size: Optional[str] = "n_cls",
+    dependence: Optional[Literal["both", "dependent", "independent"]] = None,
     show: bool = False,
     **kwargs,
 ) -> None:
@@ -644,11 +661,22 @@ def scatter_grid(
         "ec_g": "EC (global)",
         "ec_l": "EC (local)",
         "e_v": "Cramer's V",
+        "e_corr": "Error corr",
         "s": "Error set max size",
         "r": "Error independence",
         "n_cls": "Number of classes",
     }
     df = df.rename(columns=renames)
+    if (dependence is not None) and ((col == "errors") or (row == "errors")):
+        raise ValueError("Cannot restrict dependence and also show on grid")
+    if dependence is None:
+        dependence = "both"
+
+    if dependence == "dependent":
+        df = df.loc[df["errors"] == "dependent"]
+    elif dependence == "independent":
+        df = df.loc[df["errors"] == "independent"]
+
     x = renames[x] if x in renames else x
     y = renames[y] if y in renames else y
     hue = renames[hue] if hue in renames else hue
@@ -680,23 +708,39 @@ def scatter_grid(
     )
     fig: Figure = plt.gcf()
     if hue is not None:
-        suptitle = f"{y} vs. {x} (by {hue})"
+        suptitle = f"{y} vs {x} (by {hue})"
     else:
-        suptitle = f"{y} vs. {x}"
+        suptitle = f"{y} vs {x}"
+    if row is not None and col is not None:
+        suptitle = f"{suptitle} [{row} x {col}]"
+    elif row is not None and col is None:
+        suptitle = f"{suptitle} [by {row}]"
+    elif row is None and col is not None:
+        suptitle = f"{suptitle} [by {col}]"
+    if dependence != "both":
+        suptitle += f" - {dependence} only"
+
     fig.suptitle(suptitle if title is None else title)
     ax: Axes
     for ax in grid.axes.flat:
-        errs = ax.get_title().split(" ")[-1]
-        r = f"(Pearson's r={corrs[errs].round(3)})"
+        edist = ax.get_title().split(" ")[-1]
+        if row is not None and col is not None:
+            ydist = ax.get_title().split(" |")[0].split(" ")[-1]
+            r = f"(Pearson's r={corrs[edist][ydist].round(3)})"
+        else:
+            r = f"(Pearson's r={corrs[edist].round(3)})"
         ax.set_title(f"{ax.get_title()}\n{r}")
     fig.tight_layout()
     fig.subplots_adjust(right=0.85)
     if show:
         return plt.show()
+    if title is None:
+        title = suptitle
     outname = title.replace(" ", "_")
     outname = re.sub(r"[^a-zA-Z\d_]", "", outname)
     outfile = PLOTS / f"{outname}.png"
     plt.savefig(outfile, dpi=200)
+    plt.close()
     print(f"Saved plot to {outfile}")
 
 
@@ -719,18 +763,22 @@ def run_compare_styles(
     # df.groupby("errors").corr()["a_mean"].abs().sort_values()
 
     # least related to dependence are e_ebv, e_corr or ec_r, e_v, and finally K
-    scatter_grid(
-        df=df,
-        x="a_mean",
-        y="ec_g",
-        # col=None,
-        col="edist",
-        row="pdist",
-        marker="errors",
-        hue="mean_cls",
-        title="EC (local) vs. Mean Accuracy (by dependence)",
-        show=True,
-    )
+    for metric in ["ec_g", "ec_gi", "ec_l", "K", "e_v", "e_corr"]:
+        for dependence in ["dependent", "independent"]:
+            scatter_grid(
+                df=df,
+                x="a_mean",
+                y=metric,
+                # col=None,
+                col="edist",
+                row="ydist",
+                markers="errors",
+                hue="mean_cls",
+                dependence=dependence,  # type: ignore
+                # title="EC (local) vs. Mean Accuracy (by dependence)",
+                show=False,
+            )
+    return
 
     scatter_grid(
         df=df,
@@ -739,7 +787,7 @@ def run_compare_styles(
         row="errors",
         col="acc",
         col_order=["<33%", "33%-66%", ">66%"],
-        hue="cls_max",
+        hue="mean_cls",
         title="EC (local) vs. Mean Accuracy (by dependence)",
         show=True,
     )
@@ -757,5 +805,5 @@ def run_compare_styles(
 if __name__ == "__main__":
     # run_compare_raters()
     # run_compare_styles(n_iter=25000, mode="append")
-    # run_compare_styles(n_iter=50000, mode="cached")
+    # run_compare_styles(n_iter=100_000, mode="cached")
     run_compare_styles(n_iter=100_000, mode="overwrite", compute_only=True)
