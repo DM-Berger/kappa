@@ -521,7 +521,7 @@ def get_df(
         df_all = pd.concat(dfs, axis=0, ignore_index=True)
         corrs_all = pd.concat(corrs, axis=0, ignore_index=True)
         c_all = pd.concat(
-            [df_all.loc[:, ["n_cls", "dist", "errors", "r", "s", "sr"]], corrs_all],
+            [df_all.loc[:, ["n_cls", "edist", "ydist", "errors", "r", "s", "sr"]], corrs_all],
             axis=1,
         )
         df_all.to_parquet(DF_OUT)
@@ -534,7 +534,7 @@ def get_df(
         df_all = pd.concat(dfs, axis=0, ignore_index=True)
         corrs_all = pd.concat(corrs, axis=0, ignore_index=True)
         c_all = pd.concat(
-            [df_all.loc[:, ["n_cls", "dist", "errors", "r", "s", "sr"]], corrs_all],
+            [df_all.loc[:, ["n_cls", "edist", "ydist", "errors", "r", "s", "sr"]], corrs_all],
             axis=1,
         )
 
@@ -546,7 +546,7 @@ def get_df(
         raise ValueError("Missing pre-computed tables.")
 
     df = pd.concat(
-        [df_all, c_all.drop(columns=["n_cls", "dist", "errors", "r", "s", "sr"])], axis=1
+        [df_all, c_all.drop(columns=["n_cls", "edist", "ydist", "errors", "r", "s", "sr"])], axis=1
     )
     # correct the different meaning of "r" in the two cases
     inds = df["errors"] == "independent"
@@ -724,7 +724,9 @@ def run_compare_styles(
         x="a_mean",
         y="ec_g",
         # col=None,
-        col="errors",
+        col="edist",
+        row="pdist",
+        marker="errors",
         hue="mean_cls",
         title="EC (local) vs. Mean Accuracy (by dependence)",
         show=True,
