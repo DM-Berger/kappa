@@ -32,7 +32,7 @@ prediction vector of class labels $\symbfit{y}\_i \in [0, 1, \dots, c - 1]^n$
 for $c$ classes, and a set of runs yields a set of predictions
 $\symbfit{y}\_1, \dots,  \symbfit{y}\_k$. This yields $k(k-1)/2$ distinct
 pairings of runs.  Given a function $M$ such
-that $M(\symbfit{y}_{i}, \symbfit{y}_{j}) = m_{ij} \in \mathbb{R}$
+that $M(\symbfit{y}\_i, \symbfit{y}\_j) = m_{ij} \in \mathbb{R}$
 for $i > j$, then we can define a *(pairwise) metric reproducibility
 distribution* $\mathcal{M} = \{ m\_{ij} : i > j \}$
 over the repeated model runs. A ***pairwise reproducibility metric*** is any
