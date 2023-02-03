@@ -72,14 +72,14 @@ where $\land$ and $\lor$ treat the binary vectors as booleans and compute
 elementwise logical operations *and* and *or*, respectively. Then we can define
 the following metrics:
 
-**Local Error consistency (EC_l)**:
+**Local Error Consistency (EC_l)**:
 
 $$\begin{align*}
 \text{EC}_{\ell} &= \frac{|\symbfit{e}_i \cap \symbfit{e}_j|}{|\symbfit{e}_i \cup \symbfit{e}_j|} \\
 &= \frac{sum(\symbfit{e}_i \land \symbfit{e}_j)}{sum(\symbfit{e}_i \lor\symbfit{e}_j)} \\
 \end{align*}$$
 
-**Global Error consistency (EC_g)**:
+**Global Error Consistency (EC_g)**:
 
 $$\begin{align*}
 \text{EC}_{g} &= \frac{|\symbfit{e}_i \cap \symbfit{e}_j|}{n} \\
@@ -87,13 +87,43 @@ $$\begin{align*}
 &= \text{mean}(\symbfit{e}_i \land \symbfit{e}_j) \\
 \end{align*}$$
 
+**Accuracy-Based Error Consistency (EC_acc)**:
+
+$$\begin{align*}
+\text{EC}_{\text{acc}} &= \text{acc}(\symbfit{e}_i, \symbfit{e}_j) \\
+ &= \text{mean}(\symbfit{e}_i = \symbfit{e}_j) \\
+\end{align*}$$
+
+**Correlation-Based Error Consistency (EC_corr)**:
+
+$$\begin{align*}
+\text{EC}_{\text{corr}} &= \text{corr}(\symbfit{e}_i, \symbfit{e}_j) \\
+\end{align*}$$
+
+where $\text{corr}(x, y)$ is the Pearson correlation coefficient between $x$
+and $y$, making this equivalent to the $\phi$- or Matthews correlation
+coefficient between binary errors.
+
 ### Prediction-Based
 
 Other pairwise reproducibility metrics can be defined by choosing $M$ to be a
 distance or similarity metric, or a measure of association (e.g. correlation,
 agreement).
 
-**Kappa-Based Error Agreement ($\text{EA}\_{\kappa}$)**
+**Kappa-Based Prediction Agreement (PA_K)**
+
+$$
+\text{PA}_{\kappa} = \kappa(\symbfit{y}_i, \symbfit{y}_j)
+$$
+
+Where $\kappa$ is the Cohen's Kappa agreement between prediction vectors. While
+this naturally handles multi-class problems, interpretation is highly dubious,
+as we should in general expect strong dependency among predictions, which
+violates a core assumption of Cohen's $\kappa$.
+
+**Note**: I also tested **Cramer's V**, **Krippendorf's** $\alpha$, and Gwet's
+**AC1/2**, but they show largely identical behaviour to $\kappa$, and so are
+not discussed further.
 
 
 
