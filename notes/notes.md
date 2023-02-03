@@ -34,7 +34,7 @@ $\symbfit{y}_{1}, \dots,  \symbfit{y}_{k}$. This yields $k(k-1)/2$ distinct
 pairings of runs.  Given a function $M$ such
 that $M(\symbfit{y}_{i}, \symbfit{y}_{j}) = m_{ij} \in \mathbb{R}$
 for $i > j$, then we can define a *(pairwise) metric reproducibility
-distribution* $\mathcal{M} = \left\{ m_{ij} : i > j \right\}$
+distribution* $\mathcal{M} = \{ m_{ij} : i > j \}$
 over the repeated model runs. A ***pairwise reproducibility metric*** is any
 real-valued summary (statistic) of $\mathcal{M}$.
 
