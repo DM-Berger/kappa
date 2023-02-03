@@ -93,7 +93,7 @@ Other pairwise reproducibility metrics can be defined by choosing $M$ to be a
 distance or similarity metric, or a measure of association (e.g. correlation,
 agreement).
 
-**Kappa-Based Error Agreement ($\text{EA}_{\kappa}$)**
+**Kappa-Based Error Agreement ($\text{EA}\_{\kappa}$)**
 
 
 
