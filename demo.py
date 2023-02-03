@@ -182,6 +182,8 @@ def get_stats(
     ecl_mean, ecl_range, ecl_rrange, ecl_max, ecl_min = get_desc(ecls)
     umean, urange, _, umax, umin = get_desc(unions)
 
+    cls_counts = np.unique(y, return_counts=True)[1]
+
     means = DataFrame(
         {
             "e_corr": e_corr,
@@ -192,6 +194,9 @@ def get_stats(
             "e_sbv": e_sbv,  # type: ignore
             "a_mean": amean,
             "union_max": umax,
+            "max_cls": cls_counts.max() / len(y),
+            "min_cls": cls_counts.min() / len(y),
+            "mean_cls": cls_counts.mean() / len(y),
             # "C_12_acc": C_12_acc,
             "ec_r": ec_r,
             # "ec_br": ec_br,
@@ -524,6 +529,9 @@ def get_df(
     inds = df["errors"] == "independent"
     df.loc[inds, "s"] = df.loc[inds, "sr"]
     df.loc[inds, "r"] = 1.0
+    df["acc"] = df["a_mean"].apply(
+        lambda acc: "<33%" if acc < 1 / 3 else (">66%" if acc > 2 / 3 else "33%-66%")
+    )
     return df
 
 
@@ -564,12 +572,12 @@ def print_descriptions(df: DataFrame) -> None:
     print("EC correlations taking into account distributions")
     for col in cols:
         print("\n", col.upper())
-        print(cg[col].unstack().round(3))
+        print(cg[col].unstack().round(3).T)
     cols = list(filter(lambda c: "K" in c, cg.columns))
     print("Kappa correlations taking into account distributions")
     for col in cols:
         print("\n", col.upper())
-        print(cg[col].unstack().round(3))
+        print(cg[col].unstack().round(3).T)
 
     print("=" * 80)
     print("Correlations ignoring distributions")
@@ -582,22 +590,24 @@ def print_descriptions(df: DataFrame) -> None:
     print("EC correlations ignoring distributions")
     for col in cols:
         print("\n", col.upper())
-        print(cg[col].unstack().round(3))
+        print(cg[col].unstack().round(3).T)
 
     cols = list(filter(lambda c: "K" in c, cg.columns))
     print("Kappa correlations ignoring distributions")
     for col in cols:
         print("\n", col.upper())
-        print(cg[col].unstack().round(3))
+        print(cg[col].unstack().round(3).T)
 
 
 def scatter_grid(
     df: DataFrame,
     x: str,
     y: str,
-    title: str,
+    title: Optional[str] = None,
     col: Optional[str] = "errors",
+    col_order: Optional[List[str]] = None,
     row: Optional[str] = None,
+    row_order: Optional[List[str]] = None,
     hue: Optional[str] = "r",
     size: Optional[str] = "n_cls",
     show: bool = False,
@@ -617,6 +627,7 @@ def scatter_grid(
     df = df.rename(columns=renames)
     x = renames[x] if x in renames else x
     y = renames[y] if y in renames else y
+    hue = renames[hue] if hue in renames else hue
     if row is None:
         corrs = df.groupby(col)[x].corr(df[y])
     else:
@@ -627,15 +638,21 @@ def scatter_grid(
         x=x,
         y=y,
         row=renames[row] if row in renames else row,
+        row_order=row_order,
         col=renames[col] if col in renames else col,
-        hue=renames[hue] if hue in renames else hue,
+        col_order=col_order,
+        hue=hue,
         # palette="rocket_r",
         # palette="crest",
         palette="flare",
         size=renames[size] if size in renames else size,
     )
     fig: Figure = plt.gcf()
-    fig.suptitle(title)
+    if hue is not None:
+        suptitle = f"{y} vs. {x} (by {hue})"
+    else:
+        suptitle = f"{y} vs. {x}"
+    fig.suptitle(suptitle if title is None else title)
     ax: Axes
     for ax in grid.axes.flat:
         errs = ax.get_title().split(" ")[-1]
@@ -662,11 +679,29 @@ def run_compare_styles(
     #     df=df, x="a_mean", y="alpha", title="Krippendorf's Alpha vs. Mean Accuracy"
     # )
     # scatter_grid(df=df, x="a_mean", y="ec_g", title="EC (global) vs. Mean Accuracy"
+
+    # find those least related to accuracy
+    # df.groupby("errors").corr()["a_mean"].abs().sort_values()
+
+    # least related to dependence are e_ebv, e_corr or ec_r, e_v, and finally K
     scatter_grid(
         df=df,
         x="a_mean",
-        y="ec_l",
-        hue="r",
+        y="ec_g",
+        row="errors",
+        hue="max_cls",
+        title="EC (local) vs. Mean Accuracy (by dependence)",
+        show=True,
+    )
+
+    scatter_grid(
+        df=df,
+        x="a_mean",
+        y="ec_g",
+        row="errors",
+        col="acc",
+        col_order=["<33%", "33%-66%", ">66%"],
+        hue="cls_max",
         title="EC (local) vs. Mean Accuracy (by dependence)",
         show=True,
     )
@@ -685,3 +720,4 @@ if __name__ == "__main__":
     # run_compare_raters()
     # run_compare_styles(n_iter=25000, mode="append")
     run_compare_styles(n_iter=50000, mode="cached")
+    # run_compare_styles(n_iter=50000, mode="overwrite")
