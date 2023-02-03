@@ -40,7 +40,15 @@ def ensure_dir(path: Path) -> Path:
 ROOT = Path(__file__).resolve().parent
 PLOTS = ensure_dir(ROOT / "plots")
 
-DIST_ORDER = ["unif", "exp", "exp-r", "exp2", "exp2-r", "multimodal", "bimodal"]
+DIST_ORDER = [
+    "unif",
+    "exp",
+    "exp-r",
+    "multimodal",
+    "multimodal-r",
+    "bimodal",
+    "bimodal-r",
+]
 CORR_STRENGTHS = [((1 - 0.1 * p) / 2, 0.1 * p, (1 - 0.1 * p) / 2) for p in range(11)]
 N = 1000
 N_REP = 20
@@ -333,7 +341,7 @@ def compare_error_styles(args: Namespace) -> Tuple[DataFrame, DataFrame]:
     ys = [y.copy() for _ in range(5)]
     n_max_err = ceil(s * len(y))
     err_max_idx = rng.permutation(len(y))[:n_max_err]
-    if ydist == "multimodal" and edist == "multimodal":
+    if "multi" in ydist and "multi" in edist:
         # force same number of modes
         p = get_p(edist, n_classes, rng, n_modes=n_modes)[0]
     else:
@@ -403,7 +411,7 @@ def get_df(
     n_iter: int = 25000, mode: Literal["append", "overwrite", "cached"] = "cached"
 ) -> DataFrame:
     STYLES = ["independent", "dependent"]
-    DISTS = ["unif", "bimodal", "multimodal", "exp", "exp-r"]
+    DISTS = DIST_ORDER
     ss = np.random.SeedSequence()
     seeds = ss.spawn(n_iter)
 
@@ -485,12 +493,12 @@ def get_df(
 
 
 def print_descriptions(df: DataFrame) -> None:
-    dists = pd.get_dummies(df[["errors", "dist"]])
+    dists = pd.get_dummies(df[["errors", "ydist", "edist"]])
     df = pd.concat(
         [
             df.loc[:, "n_cls"].to_frame(),
             dists,
-            df.drop(columns=["errors", "dist", "n_cls"]),
+            df.drop(columns=["errors", "ydist", "edist", "n_cls"]),
         ],
         axis=1,
     )
@@ -499,12 +507,12 @@ def print_descriptions(df: DataFrame) -> None:
     # fmt[0] = "0.0f"
     # print(df.to_markdown(tablefmt="simple", floatfmt=fmt, index=False))
     pd.options.display.max_rows = 1000
-    desc = df.groupby(["errors", "dist"]).describe()
+    desc = df.groupby(["errors", "ydist", "edist"]).describe()
     print(desc.round(3).T)
     print("Min values")
-    print(df.groupby(["errors", "dist"]).min().T.round(3))
+    print(df.groupby(["errors", "yist", "edist"]).min().T.round(3))
     print("Max values")
-    print(df.groupby(["errors", "dist"]).max().T.round(3))
+    print(df.groupby(["errors", "yist", "edist"]).max().T.round(3))
     # print("EC / acc_mean correlation:", df.ec_q.corr(df.acc_mean))
     # print("EC / Kappa_y correlation:", df.ec.corr(df.k_y))
     # print("EC / Kappa_e correlation:", df.ec.corr(df.k_e))
@@ -513,7 +521,7 @@ def print_descriptions(df: DataFrame) -> None:
     print("=" * 80)
     print("Correlations taking into account distributions")
     print("=" * 80)
-    cg = df.groupby(["errors", "dist"]).corr("pearson")
+    cg = df.groupby(["errors", "ydist", "edist"]).corr("pearson")
     print(cg.round(3))
     corrs = df.corr("pearson")
     print(corrs.round(3))
@@ -531,7 +539,7 @@ def print_descriptions(df: DataFrame) -> None:
     print("=" * 80)
     print("Correlations ignoring distributions")
     print("=" * 80)
-    cg = df.drop(columns="dist").groupby(["errors"]).corr("pearson")
+    cg = df.drop(columns=["ydist", "edist"]).groupby(["errors"]).corr("pearson")
     print(cg.round(3))
     corrs = df.corr("pearson")
     print(corrs.round(3))
@@ -745,7 +753,7 @@ def run_compare_styles(
             )
         )
     )
-    process_map(scatter_grid_p, args)
+    process_map(scatter_grid_p, args, max_workers=8)
     return
 
     # look at small number of classes only
@@ -764,5 +772,5 @@ def run_compare_styles(
 if __name__ == "__main__":
     # run_compare_raters()
     # run_compare_styles(n_iter=25000, mode="append")
-    # run_compare_styles(n_iter=100_000, mode="cached")
-    run_compare_styles(n_iter=100_000, mode="overwrite", compute_only=True)
+    run_compare_styles(n_iter=100_000, mode="cached")
+    # run_compare_styles(n_iter=100_000, mode="overwrite", compute_only=True)
