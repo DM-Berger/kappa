@@ -162,6 +162,7 @@ def get_stats(
     Cs = [confusion(y, yy, labels=list(range(n_classes))) for yy in ys]
     # C_12_accs = [np.mean(C1 == C2) for C1, C2 in combinations(Cs, 2)]
     ks = [kappa(*comb) for comb in y_combs]
+    kes = [kappa(*comb) for comb in e_combs]
     kys = [kappa(y, yy) for yy in ys]
 
     ec_r = np.mean(ec_rs)
@@ -175,6 +176,7 @@ def get_stats(
     # distributional stats
     amean, arange, arrange, _, _ = get_desc(accs)
     kmean, krange, krrange, kmax, kmin = get_desc(ks)
+    ke_mean, ke_range, ke_rrange, ke_max, ke_min = get_desc(kes)
     ecg_mean, ecg_range, ecg_rrange, ecg_max, ecg_min = get_desc(ec_gs)
     ecgi_mean, ecgi_range, ecgi_rrange, ecgi_max, ecgi_min = get_desc(ec_gis)
     ecl_mean, ecl_range, ecl_rrange, ecl_max, ecl_min = get_desc(ecls)
@@ -205,6 +207,7 @@ def get_stats(
             # "alpha": cac.krippendorff()["est"]["coefficient_value"],
             # "ac2": cac.gwet()["est"]["coefficient_value"],
             "K": kmean,
+            "K_e": ke_mean,
         },
         index=[0],
     )
@@ -217,6 +220,10 @@ def get_stats(
             "k_rrng": krrange,
             "k_mx": kmax,
             "k_mn": kmin,
+            "ke_rng": ke_range,
+            "ke_rrng": ke_rrange,
+            "ke_mx": ke_max,
+            "ke_mn": ke_min,
             "ecg_rng": ecg_range,
             "ecg_rrng": ecg_rrange,
             "ecg_mx": ecg_max,
@@ -235,8 +242,14 @@ def get_stats(
             "u_mn": umin,
             "r(Ky, acc)": np.corrcoef(accs, kys)[0, 1],
             "r(K, ec_g)": np.corrcoef(ks, ec_gs)[0, 1],
+            "r(K, ec_gi)": np.corrcoef(ks, ec_gis)[0, 1],
             "r(K, ec_l)": np.corrcoef(ks, ecls)[0, 1],
+            "r(K_e, ec_g)": np.corrcoef(kes, ec_gs)[0, 1],
+            "r(K_e, ec_gi)": np.corrcoef(ks, ec_gis)[0, 1],
+            "r(K_e, ec_l)": np.corrcoef(kes, ecls)[0, 1],
             "r(ec_g, ec_l)": np.corrcoef(ec_gs, ecls)[0, 1],
+            "r(ec_g, ec_gi)": np.corrcoef(ec_gs, ec_gis)[0, 1],
+            "r(ec_l, ec_gi)": np.corrcoef(ecls, ec_gis)[0, 1],
         },
         index=[0],
     )
@@ -671,4 +684,4 @@ def run_compare_styles(
 if __name__ == "__main__":
     # run_compare_raters()
     # run_compare_styles(n_iter=25000, mode="append")
-    run_compare_styles(n_iter=50000, mode="overwrite")
+    run_compare_styles(n_iter=50000, mode="cached")
