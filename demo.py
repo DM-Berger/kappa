@@ -44,7 +44,7 @@ Y_DIST_ORDER = [
     "unif",
     "exp",
     "multimodal",
-    "bimodal",
+    # "bimodal",
 ]
 E_DIST_ORDER = [
     "unif",
@@ -52,9 +52,24 @@ E_DIST_ORDER = [
     "exp-r",
     "multimodal",
     "multimodal-r",
-    "bimodal",
-    "bimodal-r",
+    # "bimodal",
+    # "bimodal-r",
 ]
+RENAMES = {
+    "a_mean": "Percent Agreement",
+    "K": "EA (kappa)",
+    "mean_cls": "Avg. Class Prob",
+    "alpha": "Krippendorf's alpha",
+    "ec_g": "EC (acc)",
+    "ec_gi": "EC (global)",
+    "ec_l": "EC (local)",
+    "e_v": "EA (Cramer's V)",
+    "e_corr": "EC (corr)",
+    "s": "Error set max size",
+    "r": "Error independence",
+    "n_cls": "Number of classes",
+}
+
 CORR_STRENGTHS = [((1 - 0.1 * p) / 2, 0.1 * p, (1 - 0.1 * p) / 2) for p in range(11)]
 N = 1000
 N_REP = 20
@@ -579,20 +594,7 @@ def scatter_grid(
     **kwargs,
 ) -> None:
     sbn.set_style("darkgrid")
-    renames = {
-        "a_mean": "acc_mean",
-        "K": "kappa",
-        "mean_cls": "Avg. Class Prob",
-        "alpha": "Krippendorf's alpha",
-        "ec_g": "EC (global)",
-        "ec_l": "EC (local)",
-        "e_v": "Cramer's V",
-        "e_corr": "Error corr",
-        "s": "Error set max size",
-        "r": "Error independence",
-        "n_cls": "Number of classes",
-    }
-    df = df.rename(columns=renames)
+    df = df.rename(columns=RENAMES)
     if (dependence is not None) and ((col == "errors") or (row == "errors")):
         raise ValueError("Cannot restrict dependence and also show on grid")
     if dependence is None:
@@ -603,9 +605,9 @@ def scatter_grid(
     elif dependence == "independent":
         df = df.loc[df["errors"] == "independent"]
 
-    x = renames[x] if x in renames else x
-    y = renames[y] if y in renames else y
-    hue = renames[hue] if hue in renames else hue
+    x = RENAMES[x] if x in RENAMES else x
+    y = RENAMES[y] if y in RENAMES else y
+    hue = RENAMES[hue] if hue in RENAMES else hue
     if row == col:
         raise ValueError(
             "Cannot have `row` == `col`, will cause very inscrutable errors."
@@ -621,15 +623,15 @@ def scatter_grid(
         data=df,
         x=x,
         y=y,
-        row=renames[row] if row in renames else row,
+        row=RENAMES[row] if row in RENAMES else row,
         row_order=row_order,
-        col=renames[col] if col in renames else col,
+        col=RENAMES[col] if col in RENAMES else col,
         col_order=col_order,
         hue=hue,
         # palette="rocket_r",
         # palette="crest",
         palette="flare",
-        size=renames[size] if size in renames else size,
+        size=RENAMES[size] if size in RENAMES else size,
         **kwargs,
     )
     fig: Figure = plt.gcf()
@@ -679,6 +681,29 @@ def scatter_grid_p(args: Dict[str, Any]) -> None:
     return scatter_grid(**args)
 
 
+def print_core_tables(df: DataFrame) -> None:
+    METRICS = ["ec_g", "ec_gi", "ec_l", "K", "e_v", "e_corr", "a_mean"]
+    metrics = [RENAMES[m] if m in RENAMES else m for m in METRICS]
+    dfr = df.rename(columns=RENAMES)
+    desc = (
+        dfr.groupby(["errors"])[metrics]
+        .describe(percentiles=[0.025, 0.25, 0.75, 0.975])
+        .T.unstack()
+        .round(3)
+    )
+
+    for _metric in METRICS:
+        metric = RENAMES[_metric] if _metric in RENAMES else _metric
+        desc = dfr.groupby(["errors"])[metrics].describe().T.unstack()
+
+        desc = dfr.groupby(["edist", "ydist", "errors"])[metric].describe(
+            percentiles=[0.025, 0.975]
+        )
+        rng = desc["max"] - desc["min"]
+        rrng = desc["97.5%"] - desc["2.5%"]
+        ddf = DataFrame({"range": rng, "rrange": rrng}, index=desc.index)
+
+
 def run_compare_styles(
     n_iter: int = 25000,
     mode: Literal["append", "overwrite", "cached"] = "cached",
@@ -714,7 +739,7 @@ def run_compare_styles(
                 hue=["mean_cls"],
                 dependence=["dependent", "independent"],  # type: ignore
                 outdirname=["by_dist"],
-                subplots_adjust=[dict(right=0.95, top=0.9)],
+                subplots_adjust=[dict(right=0.92, top=0.92)],
                 show=[False],
             )
         )
@@ -759,13 +784,35 @@ def run_compare_styles(
                     hue=["mean_cls"],
                     dependence=["dependent", "independent"],  # type: ignore
                     outdirname=["few_classes"],
-                    subplots_adjust=[dict(right=0.95, top=0.9)],
+                    subplots_adjust=[dict(right=0.92, top=0.92)],
                     show=[False],
                 )
             )
         )
     )
     process_map(scatter_grid_p, args)
+
+    METRICS = ["a_mean", "ec_g", "ec_l", "ec_gi", "e_corr", "K", "e_v"]
+    metrics = [RENAMES[m] if m in RENAMES else m for m in METRICS]
+    dfr = df.rename(columns=RENAMES)
+    df_metrics = pd.melt(
+        dfr[["errors", *metrics]], id_vars="errors", value_vars=metrics, var_name="metric"
+    )
+    sbn.displot(
+        df_metrics,
+        col="errors",
+        col_order=["independent", "dependent"],
+        row="metric",
+        row_order=metrics,
+        x="value",
+        kind="hist",
+        stat="probability",
+        height=1.4,
+        aspect=3.0,
+        color="grey",
+        rug=True,
+    )
+
     return
 
     # look at small number of classes only

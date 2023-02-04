@@ -107,10 +107,16 @@ coefficient between binary errors.
 ### Prediction-Based
 
 Other pairwise reproducibility metrics can be defined by choosing $M$ to be a
-distance or similarity metric, or a measure of association (e.g. correlation,
-agreement).
+distance, similarity, or association metric operating on the predictions directly.
 
-**Kappa-Based Prediction Agreement (PA_K)**
+**Percent Agreement (PA_acc)**
+
+$$\begin{align*}
+\text{PA}_{\kappa} &= \text{acc}(\symbfit{y}_i, \symbfit{y}_j) \\
+&= \text{mean}(\symbfit{y}_i = \symbfit{y}_j) \\
+\end{align*}$$
+
+**Kappa Prediction Agreement (PA_K)**
 
 $$
 \text{PA}_{\kappa} = \kappa(\symbfit{y}_i, \symbfit{y}_j)
@@ -121,16 +127,20 @@ this naturally handles multi-class problems, interpretation is highly dubious,
 as we should in general expect strong dependency among predictions, which
 violates a core assumption of Cohen's $\kappa$.
 
-**Accuracy-Based Prediction Agreement (PA_acc)**
+**Cramer's-V Prediction Agreement (PA_V)**
 
-$$\begin{align*}
-\text{PA}_{\kappa} &= \text{acc}(\symbfit{y}_i, \symbfit{y}_j) \\
-&= \text{mean}(\symbfit{y}_i = \symbfit{y}_j) \\
-\end{align*}$$
+$$
+\text{PA}_{V} = V(\symbfit{y}_i, \symbfit{y}_j)
+$$
 
-**Note**: I also tested **Cramer's V**, **Krippendorf's** $\alpha$, and Gwet's
-**AC1/2**, but they show largely identical behaviour to $\kappa$, and so are
-not discussed further.
+Where $V$ is [Cramer's V](https://en.wikipedia.org/wiki/Cram%C3%A9r%27s_V),
+which is a correlation in $[0, 1]$ based on the $\chi^2$.
+
+
+
+**Note**: I also tested **Krippendorf's** $\alpha$, and Gwet's **AC1/2**, but
+they show largely identical behaviour to $\kappa$, and so are not discussed
+further.
 
 
 ## Metric Evaluation
