@@ -651,7 +651,7 @@ def scatter_grid(
         edist = ax.get_title().split(" ")[-1]
         if row is not None and col is not None:
             ydist = ax.get_title().split(" |")[0].split(" ")[-1]
-            r = f"(Pearson's r={corrs[edist][ydist].round(3)})"  # type: ignore
+            r = f"(Pearson's r={corrs[ydist][edist].round(3)})"  # type: ignore
         else:
             r = f"(Pearson's r={corrs[edist].round(3)})"  # type: ignore
         ax.set_title(f"{ax.get_title()}\n{r}")
@@ -758,7 +758,7 @@ def run_compare_styles(
             )
         )
     )
-    process_map(scatter_grid_p, args, max_workers=8)
+    process_map(scatter_grid_p, args)
     return
 
     # look at small number of classes only
@@ -777,5 +777,5 @@ def run_compare_styles(
 if __name__ == "__main__":
     # run_compare_raters()
     # run_compare_styles(n_iter=25000, mode="append")
-    # run_compare_styles(n_iter=100_000, mode="cached")
-    run_compare_styles(n_iter=100_000, mode="overwrite", compute_only=True)
+    run_compare_styles(n_iter=100_000, mode="cached")
+    # run_compare_styles(n_iter=100_000, mode="overwrite", compute_only=True)
