@@ -40,7 +40,13 @@ def ensure_dir(path: Path) -> Path:
 ROOT = Path(__file__).resolve().parent
 PLOTS = ensure_dir(ROOT / "plots")
 
-DIST_ORDER = [
+Y_DIST_ORDER = [
+    "unif",
+    "exp",
+    "multimodal",
+    "bimodal",
+]
+E_DIST_ORDER = [
     "unif",
     "exp",
     "exp-r",
@@ -411,7 +417,6 @@ def get_df(
     n_iter: int = 25000, mode: Literal["append", "overwrite", "cached"] = "cached"
 ) -> DataFrame:
     STYLES = ["independent", "dependent"]
-    DISTS = DIST_ORDER
     ss = np.random.SeedSequence()
     seeds = ss.spawn(n_iter)
 
@@ -423,8 +428,8 @@ def get_df(
                     "n_classes": list(range(2, 50)),
                     # "n_classes": list(range(2, 5)),
                     "errors": STYLES,
-                    "edist": DISTS,
-                    "ydist": DISTS,
+                    "edist": E_DIST_ORDER,
+                    "ydist": Y_DIST_ORDER,
                     "r": uniform(),
                     "err_size": uniform(),
                     "reps": list(range(N_REP)),
@@ -697,9 +702,9 @@ def run_compare_styles(
                 x=["a_mean"],
                 y=METRICS,
                 col=["edist"],
-                col_order=[DIST_ORDER],
+                col_order=[E_DIST_ORDER],
                 row=["ydist"],
-                row_order=[DIST_ORDER],
+                row_order=[Y_DIST_ORDER],
                 markers=["errors"],
                 hue=["mean_cls"],
                 dependence=["dependent", "independent"],  # type: ignore
@@ -741,9 +746,9 @@ def run_compare_styles(
                     x=["a_mean"],
                     y=METRICS,
                     col=["edist"],
-                    col_order=[DIST_ORDER],
+                    col_order=[E_DIST_ORDER],
                     row=["ydist"],
-                    row_order=[DIST_ORDER],
+                    row_order=[Y_DIST_ORDER],
                     markers=["errors"],
                     hue=["mean_cls"],
                     dependence=["dependent", "independent"],  # type: ignore
