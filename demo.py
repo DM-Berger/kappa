@@ -574,6 +574,7 @@ def scatter_grid(
     size: Optional[str] = "n_cls",
     dependence: Optional[Literal["both", "dependent", "independent"]] = None,
     outdirname: Optional[str] = None,
+    subplots_adjust: Optional[Dict[str, float]] = None,
     show: bool = False,
     **kwargs,
 ) -> None:
@@ -656,7 +657,11 @@ def scatter_grid(
             r = f"(Pearson's r={corrs[edist].round(3)})"  # type: ignore
         ax.set_title(f"{ax.get_title()}\n{r}")
     fig.tight_layout()
-    fig.subplots_adjust(right=0.85)
+    if subplots_adjust is None:
+        fig.subplots_adjust(right=0.85)
+    else:
+        fig.subplots_adjust(**subplots_adjust)
+
     if show:
         return plt.show()
     if title is None:
@@ -709,6 +714,7 @@ def run_compare_styles(
                 hue=["mean_cls"],
                 dependence=["dependent", "independent"],  # type: ignore
                 outdirname=["by_dist"],
+                subplots_adjust=[dict(right=0.95, top=0.9)],
                 show=[False],
             )
         )
@@ -753,6 +759,7 @@ def run_compare_styles(
                     hue=["mean_cls"],
                     dependence=["dependent", "independent"],  # type: ignore
                     outdirname=["few_classes"],
+                    subplots_adjust=[dict(right=0.95, top=0.9)],
                     show=[False],
                 )
             )
