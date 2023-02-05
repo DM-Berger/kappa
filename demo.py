@@ -161,6 +161,7 @@ def get_stats(
     # cac = CAC(DataFrame(y_tab), categories=list(range(n_classes)))
 
     # "b" for binary / boolean ,e.g. operates on binary error residuals
+    pas = [acc(*comb) for comb in y_combs]  # Percent Agreement
     e_corrs = [np.corrcoef(*comb)[0, 1] for comb in y_combs]
     e_vs = [cramer_v(*comb) for comb in y_combs]
     e_bvs = [cramer_v(*comb) for comb in e_combs]
@@ -168,17 +169,17 @@ def get_stats(
 
     e_corr = np.mean(e_corrs)
     e_v = np.mean(e_vs)
-    e_bv = np.mean(e_bvs)
+    # e_bv = np.mean(e_bvs)
     e_bcorr = np.mean(e_bcorrs)
 
     if y_errs is not None:
         # "s" for subs, e.g. the error subset
         e_subs = [y[idx] != y_err for y_err, idx in zip(y_errs, err_idx)]
         e_sub_combs = list(combinations(e_subs, 2))
-        e_sbv = np.mean([cramer_v(*comb) for comb in e_sub_combs])
+        # e_sbv = np.mean([cramer_v(*comb) for comb in e_sub_combs])
         e_sbcorr = np.mean([np.corrcoef(*comb)[0, 1] for comb in e_sub_combs])
     else:
-        e_sbv = np.nan
+        # e_sbv = np.nan
         e_sbcorr = np.nan
 
     accs = [acc(y, yy) for yy in ys]
@@ -205,7 +206,8 @@ def get_stats(
     # C_12_acc = np.mean(C_12_accs)
 
     # distributional stats
-    amean, arange, arrange, _, _ = get_desc(accs)
+    amean, arange, arrange, amax, amin = get_desc(accs)
+    pa_mean, pa_range, pa_rrange, pa_max, pa_min = get_desc(pas)
     kmean, krange, krrange, kmax, kmin = get_desc(ks)
     ke_mean, ke_range, ke_rrange, ke_max, ke_min = get_desc(kes)
     ecg_mean, ecg_range, ecg_rrange, ecg_max, ecg_min = get_desc(ec_gs)
@@ -217,13 +219,14 @@ def get_stats(
 
     means = DataFrame(
         {
+            "pa": pa_mean,
+            "a_mean": amean,
             "e_corr": e_corr,
             "e_bcorr": e_bcorr,
             "e_sbcorr": e_sbcorr,  # type: ignore
             "e_v": e_v,
-            "e_bv": e_bv,
-            "e_sbv": e_sbv,  # type: ignore
-            "a_mean": amean,
+            # "e_bv": e_bv,
+            # "e_sbv": e_sbv,  # type: ignore
             "union_max": umax,
             "max_cls": cls_counts.max() / len(y),
             "min_cls": cls_counts.min() / len(y),
@@ -248,49 +251,71 @@ def get_stats(
         index=[0],
     )
 
-    corrs = DataFrame(
+    metrics = pd.DataFrame(
         {
-            "a_rng": arange,
-            "a_rrng": arrange,
-            "k_rng": krange,
-            "k_rrng": krrange,
-            "k_mx": kmax,
-            "k_mn": kmin,
-            "ke_rng": ke_range,
-            "ke_rrng": ke_rrange,
-            "ke_mx": ke_max,
-            "ke_mn": ke_min,
-            "ecg_rng": ecg_range,
-            "ecg_rrng": ecg_rrange,
-            "ecg_mx": ecg_max,
-            "ecg_mn": ecg_min,
-            "ecgi_rng": ecgi_range,
-            "ecgi_rrng": ecgi_rrange,
-            "ecgi_mx": ecgi_max,
-            "ecgi_mn": ecgi_min,
-            "ecl_rng": ecl_range,
-            "ecl_rrng": ecl_rrange,
-            "ecl_mx": ecl_max,
-            "ecl_mn": ecl_min,
-            "u_mean": umean,
-            "u_rng": urange,
-            "u_mx": umax,
-            "u_mn": umin,
-            "r(Ky, acc)": np.corrcoef(accs, kys)[0, 1],
-            "r(K, ec_g)": np.corrcoef(ks, ec_gs)[0, 1],
-            "r(K, ec_gi)": np.corrcoef(ks, ec_gis)[0, 1],
-            "r(K, ec_l)": np.corrcoef(ks, ecls)[0, 1],
-            "r(K_e, ec_g)": np.corrcoef(kes, ec_gs)[0, 1],
-            "r(K_e, ec_gi)": np.corrcoef(ks, ec_gis)[0, 1],
-            "r(K_e, ec_l)": np.corrcoef(kes, ecls)[0, 1],
-            "r(ec_g, ec_l)": np.corrcoef(ec_gs, ecls)[0, 1],
-            "r(ec_g, ec_gi)": np.corrcoef(ec_gs, ec_gis)[0, 1],
-            "r(ec_l, ec_gi)": np.corrcoef(ecls, ec_gis)[0, 1],
-        },
-        index=[0],
+            "PA": pas,
+            "K": ks,
+            "V": e_vs,
+            "EC_g": ec_gs,
+            "EC_gi": ec_gis,
+            "EC_l": ecls,
+        }
     )
+    # get upper triangle of correlations
+    cs = metrics.corr()
+    idx = np.triu(np.ones_like(cs, dtype=bool), k=1).ravel()
+    cs = (
+        cs.stack()[idx]
+        .reset_index()
+        .rename(columns={"level_0": "m1", "level_1": "m2", "0": "r", 0: "r"})
+        .sort_values(by=["m1", "m2"])
+    )
+    names = []
+    for i in range(len(cs)):
+        names.append(f"r({cs.iloc[i, 0]}, {cs.iloc[i, 1]})")
+    cs["corr"] = names
+    cs = cs.loc[:, ["corr", "r"]]
+    cs.index = cs["corr"]
+    cs.drop(columns="corr", inplace=True)
 
-    return means, corrs
+    stats = {
+        "a_rng": arange,
+        "a_rrng": arrange,
+        "a_max": amax,
+        "a_min": amin,
+        "pa_rng": pa_range,
+        "pa_rrng": pa_rrange,
+        "pa_max": pa_max,
+        "pa_min": pa_min,
+        "k_rng": krange,
+        "k_rrng": krrange,
+        "k_max": kmax,
+        "k_man": kmin,
+        "ke_rng": ke_range,
+        "ke_rrng": ke_rrange,
+        "ke_max": ke_max,
+        "ke_man": ke_min,
+        "ecg_rng": ecg_range,
+        "ecg_rrng": ecg_rrange,
+        "ecg_max": ecg_max,
+        "ecg_man": ecg_min,
+        "ecgi_rng": ecgi_range,
+        "ecgi_rrng": ecgi_rrange,
+        "ecgi_max": ecgi_max,
+        "ecgi_man": ecgi_min,
+        "ecl_rng": ecl_range,
+        "ecl_rrng": ecl_rrange,
+        "ecl_max": ecl_max,
+        "ecl_man": ecl_min,
+        "u_mean": umean,
+        "u_rng": urange,
+        "u_max": umax,
+        "u_man": umin,
+    }
+    corrs = cs.to_dict()["r"]
+    all_stats = DataFrame({**{**stats, **corrs}}, index=[0])
+
+    return means, all_stats
 
 
 def get_p(
@@ -429,7 +454,9 @@ def compare_error_styles(args: Namespace) -> Tuple[DataFrame, DataFrame]:
 
 
 def get_df(
-    n_iter: int = 25000, mode: Literal["append", "overwrite", "cached"] = "cached"
+    n_iter: int = 25000,
+    mode: Literal["append", "overwrite", "cached"] = "cached",
+    no_parallel: bool = False,
 ) -> DataFrame:
     STYLES = ["independent", "dependent"]
     ss = np.random.SeedSequence()
@@ -461,7 +488,10 @@ def get_df(
         df_all = pd.read_parquet(DF_OUT)
         c_all = pd.read_parquet(CORRS_OUT)
     elif mode == "overwrite":
-        dfs, corrs = list(zip(*process_map(compare_error_styles, GRID, chunksize=1)))
+        if no_parallel:
+            dfs, corrs = list(zip(*map(compare_error_styles, GRID)))
+        else:
+            dfs, corrs = list(zip(*process_map(compare_error_styles, GRID, chunksize=1)))
         df_all = pd.concat(dfs, axis=0, ignore_index=True)
         corrs_all = pd.concat(corrs, axis=0, ignore_index=True)
         c_all = pd.concat(
@@ -477,7 +507,10 @@ def get_df(
         df_old = pd.read_parquet(DF_OUT)
         c_old = pd.read_parquet(CORRS_OUT)
 
-        dfs, corrs = list(zip(*process_map(compare_error_styles, GRID, chunksize=1)))
+        if no_parallel:
+            dfs, corrs = list(zip(*map(compare_error_styles, GRID)))
+        else:
+            dfs, corrs = list(zip(*process_map(compare_error_styles, GRID, chunksize=1)))
         df_all = pd.concat(dfs, axis=0, ignore_index=True)
         corrs_all = pd.concat(corrs, axis=0, ignore_index=True)
         c_all = pd.concat(
@@ -681,6 +714,69 @@ def scatter_grid_p(args: Dict[str, Any]) -> None:
     return scatter_grid(**args)
 
 
+def plot_metric_distributions(df: DataFrame) -> None:
+    METRICS = ["a_mean", "ec_g", "ec_l", "ec_gi", "e_corr", "K", "e_v"]
+    metrics = [RENAMES[m] if m in RENAMES else m for m in METRICS]
+    dfr = df.rename(columns=RENAMES)
+    df_metrics = pd.melt(
+        dfr,
+        id_vars=["errors", "edist", "ydist"],
+        value_vars=metrics,
+        var_name="Metric value",
+    )
+    # This is very good, makes it easy to compare behaviour in dependent vs. independent
+    grid = sbn.catplot(
+        df_metrics,
+        col="edist",
+        col_order=E_DIST_ORDER,
+        row="ydist",
+        row_order=Y_DIST_ORDER,
+        hue="errors",
+        hue_order=["independent", "dependent"],
+        x="Metric value",
+        y="metric",
+        order=metrics,
+        kind="violin",
+        split=True,
+        height=4,
+        aspect=0.75,
+        linewidth=0.5,
+    )
+    grid.set_titles("{row_name}-y vs {col_name}-errs")
+    outdir = ensure_dir(PLOTS / "metric_distributions")
+    outfile = outdir / f"metric_distributions_by_y_err_dists_dependence.png"
+    plt.savefig(outfile, dpi=200)
+    plt.close()
+    print(f"Saved plot to {outfile}")
+
+    # This is aso very good, summarizes above
+    grid = sbn.catplot(
+        df_metrics,
+        hue="errors",
+        hue_order=["independent", "dependent"],
+        y="value",
+        x="Metric value",
+        order=metrics,
+        kind="violin",
+        split=True,
+        height=4,
+        aspect=2,
+        linewidth=0.5,
+    )
+    grid.set_titles("{row_name}-y vs {col_name}-errs")
+    outdir = ensure_dir(PLOTS / "metric_distributions")
+    outfile = outdir / f"metric_distributions_by_dependence.png"
+    plt.savefig(outfile, dpi=200)
+    plt.close()
+    print(f"Saved plot to {outfile}")
+
+
+################################################################################
+# TODO: Plot only dependent case by dependency `r` for each metric, either dist
+# or corellations to gauge true sensitivity to dependence
+################################################################################
+
+
 def print_core_tables(df: DataFrame) -> None:
     METRICS = ["ec_g", "ec_gi", "ec_l", "K", "e_v", "e_corr", "a_mean"]
     metrics = [RENAMES[m] if m in RENAMES else m for m in METRICS]
@@ -708,8 +804,9 @@ def run_compare_styles(
     n_iter: int = 25000,
     mode: Literal["append", "overwrite", "cached"] = "cached",
     compute_only: bool = False,
+    no_parallel: bool = False,
 ) -> None:
-    df = get_df(n_iter=n_iter, mode=mode)
+    df = get_df(n_iter=n_iter, mode=mode, no_parallel=no_parallel)
     if compute_only:
         return
     METRICS = ["ec_g", "ec_gi", "ec_l", "K", "e_v", "e_corr"]
@@ -790,27 +887,23 @@ def run_compare_styles(
             )
         )
     )
-    process_map(scatter_grid_p, args)
+    # process_map(scatter_grid_p, args)
 
     METRICS = ["a_mean", "ec_g", "ec_l", "ec_gi", "e_corr", "K", "e_v"]
     metrics = [RENAMES[m] if m in RENAMES else m for m in METRICS]
     dfr = df.rename(columns=RENAMES)
     df_metrics = pd.melt(
-        dfr[["errors", *metrics]], id_vars="errors", value_vars=metrics, var_name="metric"
+        dfr,
+        id_vars=["errors", "edist", "ydist"],
+        value_vars=metrics,
+        var_name="Metric value",
     )
-    sbn.displot(
-        df_metrics,
-        col="errors",
-        col_order=["independent", "dependent"],
-        row="metric",
-        row_order=metrics,
-        x="value",
-        kind="hist",
-        stat="probability",
-        height=1.4,
-        aspect=3.0,
-        color="grey",
-        rug=True,
+    dfd = pd.melt(
+        dfr[dfr.errors == "dependent"],
+        id_vars=["edist", "ydist", "Error independence", "Error set max size"],
+        value_vars=metrics,
+        var_name="Metric",
+        value_name="Metric value",
     )
 
     return
@@ -831,5 +924,7 @@ def run_compare_styles(
 if __name__ == "__main__":
     # run_compare_raters()
     # run_compare_styles(n_iter=25000, mode="append")
-    run_compare_styles(n_iter=100_000, mode="cached")
-    # run_compare_styles(n_iter=100_000, mode="overwrite", compute_only=True)
+    # run_compare_styles(n_iter=100_000, mode="cached")
+    run_compare_styles(
+        n_iter=100_000, mode="overwrite", compute_only=True, no_parallel=False
+    )
