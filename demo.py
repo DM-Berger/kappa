@@ -55,19 +55,23 @@ E_DIST_ORDER = [
     # "bimodal",
     # "bimodal-r",
 ]
+
+METRICS = METRIC_ORDER = ["pa", "ec_g", "ec_gi", "ec_l", "e_corr", "K", "e_v"]
+DEPENDENCES = DEPENDENCE_ORDER = ["independent", "dependent"]
 RENAMES = {
-    "a_mean": "Percent Agreement",
-    "K": "EA (kappa)",
-    "mean_cls": "Avg. Class Prob",
-    "alpha": "Krippendorf's alpha",
+    "pa": "Percent Agreement",
+    "a_mean": "Mean Accuracy",
     "ec_g": "EC (acc)",
     "ec_gi": "EC (global)",
     "ec_l": "EC (local)",
-    "e_v": "EA (Cramer's V)",
     "e_corr": "EC (corr)",
+    "K": "EA (kappa)",
+    "e_v": "EA (Cramer's V)",
+    # "alpha": "Krippendorf's alpha",
     "s": "Error set max size",
     "r": "Error independence",
     "n_cls": "Number of classes",
+    "mean_cls": "Avg. Class Prob",
 }
 
 CORR_STRENGTHS = [((1 - 0.1 * p) / 2, 0.1 * p, (1 - 0.1 * p) / 2) for p in range(11)]
@@ -265,7 +269,7 @@ def get_stats(
     cs = metrics.corr()
     idx = np.triu(np.ones_like(cs, dtype=bool), k=1).ravel()
     cs = (
-        cs.stack()[idx]
+        cs.stack(dropna=False)[idx]
         .reset_index()
         .rename(columns={"level_0": "m1", "level_1": "m2", "0": "r", 0: "r"})
         .sort_values(by=["m1", "m2"])
@@ -458,7 +462,6 @@ def get_df(
     mode: Literal["append", "overwrite", "cached"] = "cached",
     no_parallel: bool = False,
 ) -> DataFrame:
-    STYLES = ["independent", "dependent"]
     ss = np.random.SeedSequence()
     seeds = ss.spawn(n_iter)
 
@@ -469,7 +472,7 @@ def get_df(
                 {
                     "n_classes": list(range(2, 50)),
                     # "n_classes": list(range(2, 5)),
-                    "errors": STYLES,
+                    "errors": DEPENDENCES,
                     "edist": E_DIST_ORDER,
                     "ydist": Y_DIST_ORDER,
                     "r": uniform(),
@@ -715,14 +718,14 @@ def scatter_grid_p(args: Dict[str, Any]) -> None:
 
 
 def plot_metric_distributions(df: DataFrame) -> None:
-    METRICS = ["a_mean", "ec_g", "ec_l", "ec_gi", "e_corr", "K", "e_v"]
     metrics = [RENAMES[m] if m in RENAMES else m for m in METRICS]
     dfr = df.rename(columns=RENAMES)
     df_metrics = pd.melt(
         dfr,
         id_vars=["errors", "edist", "ydist"],
         value_vars=metrics,
-        var_name="Metric value",
+        var_name="Metric",
+        value_name="Metric value",
     )
     # This is very good, makes it easy to compare behaviour in dependent vs. independent
     grid = sbn.catplot(
@@ -734,7 +737,7 @@ def plot_metric_distributions(df: DataFrame) -> None:
         hue="errors",
         hue_order=["independent", "dependent"],
         x="Metric value",
-        y="metric",
+        y="Metric",
         order=metrics,
         kind="violin",
         split=True,
@@ -744,18 +747,18 @@ def plot_metric_distributions(df: DataFrame) -> None:
     )
     grid.set_titles("{row_name}-y vs {col_name}-errs")
     outdir = ensure_dir(PLOTS / "metric_distributions")
-    outfile = outdir / f"metric_distributions_by_y_err_dists_dependence.png"
+    outfile = outdir / "metric_distributions_by_y_err_dists_dependence.png"
     plt.savefig(outfile, dpi=200)
     plt.close()
     print(f"Saved plot to {outfile}")
 
-    # This is aso very good, summarizes above
+    # This is also very good, summarizes above
     grid = sbn.catplot(
         df_metrics,
         hue="errors",
         hue_order=["independent", "dependent"],
-        y="value",
-        x="Metric value",
+        y="Metric value",
+        x="Metric",
         order=metrics,
         kind="violin",
         split=True,
@@ -765,7 +768,7 @@ def plot_metric_distributions(df: DataFrame) -> None:
     )
     grid.set_titles("{row_name}-y vs {col_name}-errs")
     outdir = ensure_dir(PLOTS / "metric_distributions")
-    outfile = outdir / f"metric_distributions_by_dependence.png"
+    outfile = outdir / "metric_distributions_by_dependence.png"
     plt.savefig(outfile, dpi=200)
     plt.close()
     print(f"Saved plot to {outfile}")
@@ -778,7 +781,6 @@ def plot_metric_distributions(df: DataFrame) -> None:
 
 
 def print_core_tables(df: DataFrame) -> None:
-    METRICS = ["ec_g", "ec_gi", "ec_l", "K", "e_v", "e_corr", "a_mean"]
     metrics = [RENAMES[m] if m in RENAMES else m for m in METRICS]
     dfr = df.rename(columns=RENAMES)
     desc = (
@@ -809,7 +811,6 @@ def run_compare_styles(
     df = get_df(n_iter=n_iter, mode=mode, no_parallel=no_parallel)
     if compute_only:
         return
-    METRICS = ["ec_g", "ec_gi", "ec_l", "K", "e_v", "e_corr"]
     # print_descriptions(df)
     # scatter_grid(df=df, x="a_mean", y="K", title="Cohen's Kappa vs. Mean Accuracy")
     # scatter_grid(
@@ -887,11 +888,19 @@ def run_compare_styles(
             )
         )
     )
-    # process_map(scatter_grid_p, args)
+    # process_map(scatter_grid_p, args, desc="Creating scatterplots")
+    # plot_metric_distributions(df)
 
-    METRICS = ["a_mean", "ec_g", "ec_l", "ec_gi", "e_corr", "K", "e_v"]
     metrics = [RENAMES[m] if m in RENAMES else m for m in METRICS]
     dfr = df.rename(columns=RENAMES)
+    deps = pd.get_dummies(dfr["errors"]).loc[:, "independent"]
+    dfr.errors = deps
+    dfr.rename(columns={"errors": "is_independent"}, inplace=True)
+    print(
+        dfr.groupby(["is_independent", "ydist", "edist"])
+        .corrwith(dfr["Mean Accuracy"])
+        .loc[:, metrics]
+    )
     df_metrics = pd.melt(
         dfr,
         id_vars=["errors", "edist", "ydist"],
@@ -905,6 +914,13 @@ def run_compare_styles(
         var_name="Metric",
         value_name="Metric value",
     )
+    cs = dfr.groupby(["is_independent", "ydist", "edist"]).corrwith(dfr["Mean Accuracy"]).loc[:, metrics].reset_index().drop(columns=["ydist", "edist"]).groupby("is_independent").describe(percentiles=[0.05, 0.25]).T
+    c_descs = cs.T.loc[:, (slice(None), ["mean", "min", "5%", "25%", "max"])]
+    print("Metric correlations with (useless) mean accuracy:")
+    print(c_descs.T.unstack())
+
+
+
 
     return
 
@@ -924,7 +940,7 @@ def run_compare_styles(
 if __name__ == "__main__":
     # run_compare_raters()
     # run_compare_styles(n_iter=25000, mode="append")
-    # run_compare_styles(n_iter=100_000, mode="cached")
-    run_compare_styles(
-        n_iter=100_000, mode="overwrite", compute_only=True, no_parallel=False
-    )
+    run_compare_styles(n_iter=100_000, mode="cached")
+    # run_compare_styles(
+    #     n_iter=100_000, mode="overwrite", compute_only=True, no_parallel=False
+    # )
