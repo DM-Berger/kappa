@@ -255,8 +255,12 @@ Alternately, we may wish to force an explicitly random, step-like distribution:
 #
 #
 #    Roughly, we want each step to have
-step_0_weight = np.random.uniform(0, 1)
 max_n_steps = 5
+step_diffs = reversed(sorted(np.random.uniform(0, 1, max_n_steps - 1).tolist()))
+
+step_heights =
+
+step_0_weight = np.random.uniform(0, 1)
 n_steps = random_integer(1, ceil(n_classes / max_n_steps) + 1)
 step_weights = [step_0_weight]
 for n_step in range(n_steps - 1):

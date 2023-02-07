@@ -44,6 +44,7 @@ Y_DIST_ORDER = [
     "unif",
     "exp",
     "multimodal",
+    "step",
     # "bimodal",
 ]
 E_DIST_ORDER = [
@@ -52,6 +53,8 @@ E_DIST_ORDER = [
     "exp-r",
     "multimodal",
     "multimodal-r",
+    "step",
+    "step-r",
     # "bimodal",
     # "bimodal-r",
 ]
@@ -321,10 +324,31 @@ def get_stats(
 
     return means, all_stats
 
+def get_step_ps(n_classes: int, rng: Generator) -> ndarray:
+    max_width = ceil(n_classes / 5)
+    n_steps = rng.integers(2, max(3, ceil(n_classes / 5) + 1))  # n_steps >= 2
+    step_diffs = list(
+        reversed(sorted(np.diff(rng.uniform(0, 1, n_classes + 1)).tolist()))
+    )
+    steps, step_widths = [], []
+    for i in range(n_steps):
+        wmax = min(max_width, n_classes - np.sum(step_widths))
+        if wmax > 2:
+            width = int(rng.integers(2, wmax))
+        else:
+            width = 0
+        steps.extend([step_diffs[i] for _ in range(width)])
+        step_widths.append(width)
+
+    n_remain = n_classes - len(steps)
+    p_remain = rng.uniform(0, 1, n_remain).tolist()
+    ps = np.array([*p_remain, *steps])
+    ps = -np.sort(-ps) / ps.sum()
+    return ps
 
 def get_p(
     dist: Literal[
-        "unif", "bimodal", "bimodal-r", "multimodal", "multimodal-r", "exp", "exp-r"
+        "unif", "bimodal", "bimodal-r", "multimodal", "multimodal-r", "step", "step-r", "exp", "exp-r"
     ],
     n_classes: int,
     rng: Generator,
@@ -351,6 +375,8 @@ def get_p(
         p = np.linspace(0, 1, n_classes) ** scale
         p /= p.sum()
         p = -np.sort(-p)
+    elif "step" in dist:
+        p = get_step_ps(n_classes=n_classes, rng=rng)
     else:
         raise ValueError()
     if "-r" in dist:
@@ -805,11 +831,12 @@ def print_core_tables(df: DataFrame) -> None:
 def run_compare_styles(
     n_iter: int = 25000,
     mode: Literal["append", "overwrite", "cached"] = "cached",
-    compute_only: bool = False,
+    make_plots: bool = False,
+    print_descs: bool = False,
     no_parallel: bool = False,
 ) -> None:
     df = get_df(n_iter=n_iter, mode=mode, no_parallel=no_parallel)
-    if compute_only:
+    if (not make_plots) and (not print_descs):
         return
     # print_descriptions(df)
     # scatter_grid(df=df, x="a_mean", y="K", title="Cohen's Kappa vs. Mean Accuracy")
@@ -888,8 +915,12 @@ def run_compare_styles(
             )
         )
     )
-    # process_map(scatter_grid_p, args, desc="Creating scatterplots")
-    # plot_metric_distributions(df)
+    if make_plots:
+        process_map(scatter_grid_p, args, desc="Creating scatterplots")
+        plot_metric_distributions(df)
+
+    if not print_descs:
+        return
 
     metrics = [RENAMES[m] if m in RENAMES else m for m in METRICS]
     dfr = df.rename(columns=RENAMES)
@@ -903,24 +934,56 @@ def run_compare_styles(
     )
     df_metrics = pd.melt(
         dfr,
-        id_vars=["errors", "edist", "ydist"],
+        id_vars=["is_independent", "edist", "ydist"],
         value_vars=metrics,
         var_name="Metric value",
     )
     dfd = pd.melt(
-        dfr[dfr.errors == "dependent"],
+        dfr[dfr["is_independent"] == 0],
         id_vars=["edist", "ydist", "Error independence", "Error set max size"],
         value_vars=metrics,
         var_name="Metric",
         value_name="Metric value",
     )
-    cs = dfr.groupby(["is_independent", "ydist", "edist"]).corrwith(dfr["Mean Accuracy"]).loc[:, metrics].reset_index().drop(columns=["ydist", "edist"]).groupby("is_independent").describe(percentiles=[0.05, 0.25]).T
+    cs = (
+        dfr.groupby(["is_independent", "ydist", "edist"])
+        .corrwith(dfr["Mean Accuracy"])
+        .loc[:, metrics]
+        .reset_index()
+        .drop(columns=["ydist", "edist"])
+        .groupby("is_independent")
+        .describe(percentiles=[0.05, 0.25])
+        .T
+    )
     c_descs = cs.T.loc[:, (slice(None), ["mean", "min", "5%", "25%", "max"])]
     print("Metric correlations with (useless) mean accuracy:")
     print(c_descs.T.unstack())
 
+    cs = (
+        dfr.groupby(["is_independent", "ydist", "edist"])
+        .corrwith(dfr["a_rng"])  # a_rrng no different really
+        .loc[:, metrics]
+        .reset_index()
+        .drop(columns=["ydist", "edist"])
+        .groupby("is_independent")
+        .describe(percentiles=[0.05, 0.25])
+        .T
+    )
+    c_descs = cs.T.loc[:, (slice(None), ["mean", "min", "5%", "25%", "max"])]
+    print("Metric correlations with accuracy range:")
+    print(c_descs.T.unstack())
 
-
+    cs = (
+        dfr.loc[dfr["is_independent"].groupby(["ydist", "edist"]) == 0]
+        .corrwith(dfr["Error independence"])
+        .loc[:, metrics]
+        .reset_index()
+        .drop(columns=["ydist", "edist"])
+        .describe(percentiles=[0.05, 0.25])
+        .T
+    )
+    print("Metric correlations with level of dependence:")
+    print(cs.unstack())
 
     return
 
@@ -940,7 +1003,7 @@ def run_compare_styles(
 if __name__ == "__main__":
     # run_compare_raters()
     # run_compare_styles(n_iter=25000, mode="append")
-    run_compare_styles(n_iter=100_000, mode="cached")
-    # run_compare_styles(
-    #     n_iter=100_000, mode="overwrite", compute_only=True, no_parallel=False
-    # )
+    # run_compare_styles(n_iter=100_000, mode="cached")
+    run_compare_styles(
+        n_iter=200_000, mode="overwrite", make_plots=True, print_descs=True, no_parallel=False
+    )
