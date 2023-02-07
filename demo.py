@@ -41,20 +41,26 @@ ROOT = Path(__file__).resolve().parent
 PLOTS = ensure_dir(ROOT / "plots")
 
 Y_DIST_ORDER = [
+    "flat",
+    "balanced",
     "unif",
     "exp",
     "multimodal",
-    "step",
+    # "step",
     # "bimodal",
 ]
 E_DIST_ORDER = [
+    "flat",
+    "balanced",
+    "balanced-r",
     "unif",
+    "unif-r",
     "exp",
     "exp-r",
     "multimodal",
     "multimodal-r",
-    "step",
-    "step-r",
+    # "step",
+    # "step-r",
     # "bimodal",
     # "bimodal-r",
 ]
@@ -328,13 +334,13 @@ def get_stats(
 def get_step_ps(n_classes: int, rng: Generator) -> ndarray:
     max_width = ceil(n_classes / 5)
     n_steps = rng.integers(2, max(3, ceil(n_classes / 5) + 1))  # n_steps >= 2
-    step_diffs = np.random.uniform(0, 1, n_classes).tolist()
+    step_heights = np.random.uniform(0, 1, n_classes).tolist()
     steps = []
     step_widths: List[int] = []
     for i in range(n_steps):
         wmax = min(max_width, n_classes - np.sum(step_widths))
         width = int(rng.integers(2, wmax)) if wmax > 2 else 0
-        steps.extend([step_diffs[i] for _ in range(width)])
+        steps.extend([step_heights[i] for _ in range(width)])
         step_widths.append(width)
 
     n_remain = n_classes - len(steps)
@@ -346,7 +352,11 @@ def get_step_ps(n_classes: int, rng: Generator) -> ndarray:
 
 def get_p(
     dist: Literal[
+        "flat",
         "unif",
+        "unif-r",
+        "balanced",
+        "balanced-r",
         "bimodal",
         "bimodal-r",
         "multimodal",
@@ -360,13 +370,21 @@ def get_p(
     rng: Generator,
     n_modes: Optional[int] = None,
 ) -> Tuple[Optional[ndarray], Optional[int]]:
-    if dist == "unif":
+    if dist == "flat":
         return None, n_modes
-
-    if "bimodal" in dist:
+    if dist == "unif":
+        p = rng.uniform(0, 1, size=n_classes)
+        p /= p.sum()
+        p = -np.sort(-p)
+        return p, n_modes
+    elif "bimodal" in dist:
         extreme = n_classes / 2
         p = np.ones([n_classes])
         p[0] = p[-1] = extreme
+        p /= p.sum()
+        p = -np.sort(-p)
+    elif "balanced" in dist:
+        p = rng.uniform(0.9, 1.1, size=n_classes)
         p /= p.sum()
         p = -np.sort(-p)
     elif "multi" in dist:
