@@ -146,14 +146,20 @@ further.
 ## Metric Evaluation: Simulated
 
 No classifiers need actually be fit to examine the general behaviour of these
-metrics. That is, given a classifier $f$, repeated trainings and evaluations
-will yield a number of predictions on some test set $\symbfit{X}$ with correct labels
-$\symbfit{y}$ shared across evaluations. Across repeats, there will be a
+metrics. That is, given a classifier $f$, repeated trainings and evaluations on
+some test data $\symbfit{x}$ will yield predictions $\symbfit{\hat{y}}_i$  with
+correct labels $\symbfit{y}$ shared across evaluations. We can *ignore* $f$ and
+$\symbfit{x}$ here and model
+$\symbfit{y}$ as being sampled from a discrete random variable $\mathbf{Y}$ with possible values $\{0, 1, ..., c-1\}$ for $c$ classes. We can model the predictions $\symbfit{\hat{y}}_i$ as samples
+from a discrete random variable $\hat{\mathbf{Y}}$. The we can investigate the
+behaviour of various reproducibility metrics by specifying different distributions
+and relationships for $\mathbf{Y}$ and $\hat{\mathbf{Y}}$.
+
+
+For example, across repeats, there will always be a
 **maximum error set size** $s \in [0, 1]$ which is the largest proportion of
 test samples for which there is an erroneous prediction (i.e. at least $1 - s$
-samples are always classified correctly).
-
-The maximum error set could be:
+samples are always classified correctly).  The maximum error set could be:
 
 - **Fixed**: Errors, if they occur, occur always on the same subset of the test
   set, i.,e. always on the same indices of $\symbfit{y}$
@@ -163,7 +169,7 @@ The maximum error set could be:
 
 In addition, errors can be:
 
-- **Independent**: The predictions $\symbfit{y}_i$ and $\symbfit{y}_j$ are
+- **Independent**: The predictions $\hat{\symbfit{y}}_i$ and $\hat{\symbfit{y}}_j$ are
   independent for all repeats $i \ne j$
 - **Dependent**: All predictions depend on (are partly determined by) some
   source prediction $\symbfit{y}_{\text{base}}$, which may or not be similar

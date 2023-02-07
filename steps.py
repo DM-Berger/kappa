@@ -31,13 +31,11 @@ from typing_extensions import Literal
 matplotlib.use("QtAgg")
 
 
-def get_step_ps(n_classes: int) -> ndarray:
+def get_step_ps(n_classes: int) -> tuple[ndarray, list[int]]:
     max_width = ceil(n_classes / 5)
-    n_steps = np.random.randint(2, max(3, ceil(n_classes / 5) + 1))  # n_steps >= 2
-    # step_diffs = list(reversed(sorted(np.random.uniform(0, 1, n_classes).tolist())))
-    step_diffs = list(
-        reversed(sorted(np.diff(np.random.uniform(0, 1, n_classes + 1)).tolist()))
-    )
+    n_steps = np.random.randint(2, max(3, max_width + 1))  # n_steps >= 2
+    step_diffs = np.random.uniform(0, 1, n_classes).tolist()
+
     # step_diffs = [1.0, *step_diffs]  # E.g. now is [1, 0.86, 0.7, ...]
     steps, step_widths = [], []
     for i in range(n_steps):
@@ -53,6 +51,7 @@ def get_step_ps(n_classes: int) -> ndarray:
     p_remain = np.random.uniform(0, 1, n_remain).tolist()
     ps = np.array([*p_remain, *steps])
     ps = -np.sort(-ps) / ps.sum()
+    return ps, step_widths
 
 
 if __name__ == "__main__":
@@ -60,7 +59,7 @@ if __name__ == "__main__":
     fig, axes = plt.subplots(nrows=8, ncols=14)
     for ax in axes.flat:
         n_classes = int(np.random.randint(3, 50, size=[1]))
-        ps = get_step_ps(n_classes)
+        ps, widths = get_step_ps(n_classes)
 
         # print("n_classes:", n_classes)
         # print("n_steps:", n_steps)
@@ -70,7 +69,7 @@ if __name__ == "__main__":
 
         samples = np.random.choice(list(range(n_classes)), p=ps, size=50000)
         ax.hist(samples, bins=n_classes, color="black")
-        ax.set_title(f"step_widths: {step_widths}")
+        ax.set_title(f"step_widths: {widths}")
         ax2 = plt.twinx(ax)
         ax2.plot(ps, color="red")
 

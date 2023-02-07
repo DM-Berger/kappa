@@ -324,31 +324,37 @@ def get_stats(
 
     return means, all_stats
 
+
 def get_step_ps(n_classes: int, rng: Generator) -> ndarray:
     max_width = ceil(n_classes / 5)
     n_steps = rng.integers(2, max(3, ceil(n_classes / 5) + 1))  # n_steps >= 2
-    step_diffs = list(
-        reversed(sorted(np.diff(rng.uniform(0, 1, n_classes + 1)).tolist()))
-    )
-    steps, step_widths = [], []
+    step_diffs = np.random.uniform(0, 1, n_classes).tolist()
+    steps = []
+    step_widths: List[int] = []
     for i in range(n_steps):
         wmax = min(max_width, n_classes - np.sum(step_widths))
-        if wmax > 2:
-            width = int(rng.integers(2, wmax))
-        else:
-            width = 0
+        width = int(rng.integers(2, wmax)) if wmax > 2 else 0
         steps.extend([step_diffs[i] for _ in range(width)])
         step_widths.append(width)
 
     n_remain = n_classes - len(steps)
     p_remain = rng.uniform(0, 1, n_remain).tolist()
-    ps = np.array([*p_remain, *steps])
+    ps: ndarray = np.array([*p_remain, *steps])
     ps = -np.sort(-ps) / ps.sum()
     return ps
 
+
 def get_p(
     dist: Literal[
-        "unif", "bimodal", "bimodal-r", "multimodal", "multimodal-r", "step", "step-r", "exp", "exp-r"
+        "unif",
+        "bimodal",
+        "bimodal-r",
+        "multimodal",
+        "multimodal-r",
+        "step",
+        "step-r",
+        "exp",
+        "exp-r",
     ],
     n_classes: int,
     rng: Generator,
@@ -1005,5 +1011,9 @@ if __name__ == "__main__":
     # run_compare_styles(n_iter=25000, mode="append")
     # run_compare_styles(n_iter=100_000, mode="cached")
     run_compare_styles(
-        n_iter=200_000, mode="overwrite", make_plots=True, print_descs=True, no_parallel=False
+        n_iter=200_000,
+        mode="overwrite",
+        make_plots=True,
+        print_descs=True,
+        no_parallel=False,
     )
