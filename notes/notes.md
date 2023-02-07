@@ -143,17 +143,15 @@ they show largely identical behaviour to $\kappa$, and so are not discussed
 further.
 
 
-## Metric Evaluation
+## Metric Evaluation: Simulated
 
 No classifiers need actually be fit to examine the general behaviour of these
-metrics.
-
-Given a classifier $f$, repeated trainings and evaluations will yield a number
-of predictions on some test set with correct labels $\symbfit{y}$ shared across
-evaluations. Across repeats, there will be a **maximum error set size** $s \in
-[0, 1]$ which is the largest proportion of test samples for which there is an
-erroneous prediction (i.e. at least $1 - s$ samples are always classified
-correctly).
+metrics. That is, given a classifier $f$, repeated trainings and evaluations
+will yield a number of predictions on some test set $\symbfit{X}$ with correct labels
+$\symbfit{y}$ shared across evaluations. Across repeats, there will be a
+**maximum error set size** $s \in [0, 1]$ which is the largest proportion of
+test samples for which there is an erroneous prediction (i.e. at least $1 - s$
+samples are always classified correctly).
 
 The maximum error set could be:
 
@@ -171,9 +169,10 @@ In addition, errors can be:
   source prediction $\symbfit{y}_{\text{base}}$, which may or not be similar
   to the true labels $\symbfit{y}$
 
-Finally, both the true labels and predicted labels can have different distributions.
+Finally, both the true labels and predicted labels can have **different distributions**.
+That is, modeling the
 
-### Class Sorting
+### Class Distributions
 
 Without loss of generality, for $c$ classes, where class $i$ occurs with
 probability $p_i$, we can sort the **class probabilities** into a class
@@ -182,6 +181,10 @@ probability vector:
 $$
 p = [p_1 \ge p_2 \ge \dots \ge p_c], \quad p_i \in [0, 1]
 $$
+
+
+I.e. because the ordering of classes does not matter, we need only consider
+
 
 Then *all possible configurations of $c$ classes* are defined by the rate and
 regularity of decline of the sorted class probabilities—roughly, how flat vs.
@@ -200,18 +203,24 @@ $$
 
 The distribution may decline "smoothly", where e.g.
 $\Delta p_i = p_{i}-p_{i+1} > 0$ for $i < c$, or in a stepwise
-fashion, where $\Delta p_i = 0$ for some classes.  It is thus trivial to
+fashion, where $\Delta p_i = 0$ for some classes.  It is trivial to
 implement an algorithm that will *eventually* simulate all possible class
-distributions, by simply defining (in pseudo-code) (and assuming we choose
-the number of classes randomly in some reasonable range, say, $[2, 50]$:
+distributions, by simply defining (in pseudo-code):
 
 ```python
-p_raw = uniform(min=0, max=1, n_samples=n_classes)  # n_classes randomly chosen
+p_raw = rand_uniform(min=0, max=1, n_samples=n_classes)
 p = sort(p_raw) / sum(p_raw)
 ```
 
-However, this will only rarely simulate exponential (skewed) distributions, so
-we can force that by doing:
+that is, we sample $p_i^{\prime}$ from $c$ i.i.d. $\text{U}(0, 1)$
+distributions, and then set $p_i = p_i^{\prime} / \sum p_i^{\prime}$. However,
+this will only rarely simulate exponential (skewed) distributions, and so we
+can force other distribution types (step-like, multi-modal, exponential) by
+simply altering the generation of the $p_i$ values (see Appendix A).
+
+# Appendix A: Generating Discrete Distributions
+
+We can generate variably-exponential distributions via the algorithm:
 
 ```python
 scale = rand_uniform(1 / 10, 20)
@@ -230,7 +239,7 @@ $\Delta p_i \approx 0$. However, we may also wish to force this situation in
 simulating highly multi-modal datasets. This can also be done easily enough:
 
 ```python
-n_modes = random_integer(1, n_classes)
+n_modes = rand_integer(1, n_classes)
 extreme = n_classes / n_modes    # will be > 1
 p = ones(n_classes)              # e.g. [1, 1, 1, ....]
 p[:n_modes] = extreme            # set first n_modes elements to extreme
@@ -240,47 +249,28 @@ p = sort(p_raw) / sum(p_raw)     # final sort
 Alternately, we may wish to force an explicitly random, step-like distribution:
 
 ```python
-# Assuming 50 max classes, more than 10 steps with noise will be hard to
-# distinguish visually from just a random uniform or random exponential
-# distribution of class probabilities (it gets had to distinguish 1/4 from
-# 1/5, or definitely 1/5 from 1/6 visually). Suppose we have `c` classes.
-# IF `c == 10`, and we have 5 steps,
-#
-# We want to distinguish "stepped" class distributions from simple multi-modal
-# or otherwise common exponential or uniform distributions. Say we have <50
-# classes. Remembering that class probs are sorted, we can consider that
-# ***10*** # steps with random noise on the step probability most likely # do
-# not look much # different than a linear or exponentially declining sample for
-# the class probs `p`.
-#
-#
-#    Roughly, we want each step to have
-max_n_steps = 5
-step_diffs = reversed(sorted(np.random.uniform(0, 1, max_n_steps - 1).tolist()))
+def get_step_ps(n_classes: int) -> ndarray:
+    max_width = ceil(n_classes / 5)
+    n_steps = rand_integers(2, max(3, max_width + 1))  # n_steps >= 2
+    step_heights = rand_uniform(0, 1, n_classes)
+    steps, step_widths = [], []
+    for i in range(n_steps):
+        wmax = min(max_width, n_classes - np.sum(step_widths))
+        if wmax > 2:
+            width = rand_integer(2, wmax)
+        else:
+            width = 0
+        steps.extend([step_heights[i] for _ in range(width)])
+        step_widths.append(width)
 
-step_heights =
-
-step_0_weight = np.random.uniform(0, 1)
-n_steps = random_integer(1, ceil(n_classes / max_n_steps) + 1)
-step_weights = [step_0_weight]
-for n_step in range(n_steps - 1):
-    step_weights.append(np.random.uniform(0, 1 - np.sum(step_weights)))
-
-
-
-
-
-step_widths = random_integer(1, 10, size=n_classes)  # width in number of classes
-step_falls = random_uniform(0, 1, size=n_steps)
-
-
-
-
-extreme = n_classes / n_modes    # will be > 1
-p = ones(n_classes)              # e.g. [1, 1, 1, ....]
-p[:n_modes] = extreme            # set first n_modes elements to extreme
-p = sort(p_raw) / sum(p_raw)     # final sort
+    n_remain = n_classes - len(steps)
+    p_remain = rand_uniform(0, 1, n_remain)
+    p_raw = concatenate(p_remain, steps)
+    p = sort(p_raw) / sum(p_raw)
+    return ps
 ```
+
+
 
 In the vast majority of competent deployment scenarios (with a competent data
 scientist), one would most likely fit a classifier to data with e.g. N classes,
