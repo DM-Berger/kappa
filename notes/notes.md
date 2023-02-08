@@ -150,10 +150,10 @@ metrics. In the general case, we have data $\symbfit{x}$ which we model as sampl
 random variable $\mathcal{X}$. The class labels $\symbfit{y}$ for the data are
 distributed according to $\mathcal{Y}$, and we generally presume that
 $\mathcal{X}$ and $\mathcal{Y}$ are dependent, such that there exists a true
-$F$ such that either $\symbfit{y} = F(\symbfit{x})$, or $\symbfit{y} =
-F(\symbfit{x}) + \mathcal{E}(\symbfit{x})$, for unmodeled error or confounds
-$\mathcal{E}$. Fitting a classifier amounts to finding an $f$ that gets as close
-as possible to $F$ given data $(\symbfit{x}, \symbfit{y})$.
+$F$ such that either $\symbfit{y} = F(\symbfit{x})$, or
+$\symbfit{y} = F(\symbfit{x}) + \mathcal{E}(\symbfit{x})$, for unmodeled error
+or confounds $\mathcal{E}$. Fitting a classifier amounts to finding an $f$ that
+gets as close as possible to $F$ given data $(\symbfit{x}, \symbfit{y})$.
 
 That is, the distribution of errors for $\hat{\symbfit{y}}$
 depends
