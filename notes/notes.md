@@ -177,11 +177,11 @@ If, by contrast, $\hat{p}_i$ s and $p_i$ s differ, this simulates a classifier
 that makes *biased* random errors.
 
 By making test predictions be *dependent*, say, by having each
-$\hat{\symbfit{y}}_i$ be dependent on the true labels $\symbfit{y}$, or some
-"base" prediction $\hat{\symbfit{y}}_{\text{base}}$ which makes errors on a
+$\hat{\symbfit{y}}\_i$ be dependent on the true labels $\symbfit{y}$, or some
+"base" prediction $\hat{\symbfit{y}}\_{\text{base}}$ which makes errors on a
 proportion $r$ of samples, we can vary the classifier prediction (or error)
-consistency behaviour. For example, if each $\hat{\symbfit{y}}_i$ is a
-*perturbation* of $\hat{\symbfit{y}}_{\text{base}}$ (i.e. each element
+consistency behaviour. For example, if each $\hat{\symbfit{y}}\_i$ is a
+*perturbation* of $\hat{\symbfit{y}}\_{\text{base}}$ (i.e. each element
 $\hat{\symbfit{y}}_i^{(j)}$ is either equal to
 $\hat{\symbfit{y}}_{\text{base}}^{(j)}$, or a class label sampled randomly from
 some distribution $\hat{\mathcal{Y}}$), then by varying the degree of
