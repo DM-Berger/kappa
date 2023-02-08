@@ -176,10 +176,10 @@ well-suited for describing the relationships between $\hat{\symbfit{y}}_i$ s).
 If, by contrast, $\hat{p}_i$ s and $p_i$ s differ, this simulates a classifier
 that makes *biased* random errors.
 
-By making test predictions be *dependent* (say, by having
-each $\hat{\symbfit{y}}_i$ be dependent on the true labels $\symbfit{y}$, or some
+By making test predictions be *dependent*, say, by having each
+$\hat{\symbfit{y}}_i$ be dependent on the true labels $\symbfit{y}$, or some
 "base" prediction $\hat{\symbfit{y}}_{\text{base}}$ which makes errors on a
-proportion $r$ of samples), we can vary the classifier prediction (or error)
+proportion $r$ of samples, we can vary the classifier prediction (or error)
 consistency behaviour. For example, if each $\hat{\symbfit{y}}_i$ is a
 *perturbation* of $\hat{\symbfit{y}}_{\text{base}}$ (i.e. each element
 $\hat{\symbfit{y}}_i^{(j)}$ is either equal to
