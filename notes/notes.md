@@ -146,23 +146,39 @@ further.
 ## Metric Evaluation: Simulated
 
 No classifiers need actually be fit to examine the general behaviour of these
-metrics. That is, given a classifier $f$, repeated trainings and evaluations on
-some test data $\symbfit{x}$ will yield predictions $\symbfit{\hat{y}}_i$  with
+metrics. In the general case, we have data $\symbfit{x}$ which we sample from
+a random variable $\mathcal{X}$. The class labels $\symbfit{y}$ for the data are distributed
+according to $\mathcal{Y}$, and we generally presume that $\mathcal{X}$ and $\mathcal{Y}$
+are dependent, such that there exists a true $F$ such that $F(\symbfit{x}) \approx \symbfit{y}$ (the equality is approximate because there may be )
+
+ That is, given a classifier $f$, repeated trainings and evaluations on
+some test data $\symbfit{x}$ will yield predictions $\hat{\symbfit{y}}_i$  with
 correct labels $\symbfit{y}$ shared across evaluations. We can *ignore* $f$ and
-$\symbfit{x}$ here and model
-$\symbfit{y}$ as being sampled from a discrete random variable $\mathbf{Y}$ with possible values $\{0, 1, ..., c-1\}$ for $c$ classes. We can model the predictions $\symbfit{\hat{y}}_i$ as samples
-from a discrete random variable $\hat{\mathbf{Y}}$. The we can investigate the
-behaviour of various reproducibility metrics by specifying different distributions
-and relationships for $\mathbf{Y}$ and $\hat{\mathbf{Y}}$.
+$\symbfit{x}$ here and model $\symbfit{y}$ as being sampled from a discrete
+random variable $\mathcal{Y}$  with possible values $\{0, 1, ..., c-1\}$ for $c$
+classes, and corresponding probabilities $\{p_1, \dots p_c\}$. We can model the
+predictions $\hat{\symbfit{y}}_i$ as samples from a different discrete random variable
+$\hat{\mathcal{Y}}$. The we can investigate the behaviour of various
+reproducibility metrics by specifying different distributions and relationships
+for $\mathcal{Y}$ and $\hat{\mathcal{Y}}$.
+
+We can further add thoroughness to the simulation by specifying the $p_i$
+values probabilistically. That is, we can choose a distribution $\mathcal{D}$
+with desirable properties and sample $p_i^{\prime} \sim \mathcal{D}$ to define
+$\mathcal{Y}$ via $p_i = p_i^{\prime}/\sum p_i^{\prime}$, and then sample
+$\symbfit{y}$ from $\mathcal{Y}$ to generate a test set with class sizes
+distributed, on expectation, like $\mathcal{D}$.
+
 
 
 For example, across repeats, there will always be a
-**maximum error set size** $s \in [0, 1]$ which is the largest proportion of
-test samples for which there is an erroneous prediction (i.e. at least $1 - s$
+**maximum proportion of errors** $r \in [0, 1]$ which is the largest proportion of
+test samples for which there is an erroneous prediction (i.e. at least $1 - r$
 samples are always classified correctly).  The maximum error set could be:
 
 - **Fixed**: Errors, if they occur, occur always on the same subset of the test
-  set, i.,e. always on the same indices of $\symbfit{y}$
+  set, i.,e. always on the same indices of $\symbfit{y}$. That is,  outside of the
+  "error set", $\hat{y} = y$.
 - **Variable**: Errors never exceed $s$ proportion of test samples, but are
   not restricted to a particular subset of test samples
 
@@ -170,12 +186,16 @@ samples are always classified correctly).  The maximum error set could be:
 In addition, errors can be:
 
 - **Independent**: The predictions $\hat{\symbfit{y}}_i$ and $\hat{\symbfit{y}}_j$ are
-  independent for all repeats $i \ne j$
+  independent for all repeats $i \ne j$. Note that this also implies $\hat{\symbfit{y}}_i$
+  is independent of $\symbfit{y}_i$ for all $i$.
 - **Dependent**: All predictions depend on (are partly determined by) some
-  source prediction $\symbfit{y}_{\text{base}}$, which may or not be similar
-  to the true labels $\symbfit{y}$
+  source prediction $\symbfit{y}_{\text{base}}$, which has some dependency on
+  the true labels $\symbfit{y}$
 
-Finally, both the true labels and predicted labels can have **different distributions**.
+Finally, both the true labels and predicted labels can have **different class distributions**.
+The distribution of $\mathbf{Y}$ determines the *class balance*, and the distribution of
+$\hat{\mathbf{Y}}$ determines the prediction bias. For example, if $\mathbf{Y}$ is
+
 That is, modeling the
 
 ### Class Distributions
@@ -192,7 +212,7 @@ $$
 I.e. because the ordering of classes does not matter, we need only consider
 
 
-Then *all possible configurations of $c$ classes* are defined by the rate and
+Then *all possible configurations of* $c$ *classes* are defined by the rate and
 regularity of decline of the sorted class probabilities—roughly, how flat vs.
 skewed, and how smooth sv. step-like the sorted distribution is. and how smooth
 or step-like i. That is, the most extremely-skewed class distribution is:

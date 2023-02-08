@@ -41,24 +41,24 @@ ROOT = Path(__file__).resolve().parent
 PLOTS = ensure_dir(ROOT / "plots")
 
 Y_DIST_ORDER = [
-    "flat",
+    # "flat",  # flat and balanced never look any different
     "balanced",
-    "unif",
-    "exp",
-    "multimodal",
+    "unif",  # unif and balanced / flat DO look different
+    "multimodal",  # multi-modal and step never look any different
+    "exp",  # generally has most extreme behaviour
     # "step",
     # "bimodal",
 ]
 E_DIST_ORDER = [
-    "flat",
-    "balanced",
-    "balanced-r",
-    "unif",
-    "unif-r",
-    "exp",
-    "exp-r",
-    "multimodal",
+    # "flat",
+    "balanced",  # balanced vs. balanced-r never differ either
+    # "balanced-r",
+    "unif",  # unif vs unif-r almost never differ visibly
+    # "unif-r",
+    "multimodal",  # multi-modal vs. multi-r differ for EC (corr), others
     "multimodal-r",
+    "exp",  # exp vs. exp-r often differ dramatically
+    "exp-r",
     # "step",
     # "step-r",
     # "bimodal",
@@ -370,9 +370,9 @@ def get_p(
     rng: Generator,
     n_modes: Optional[int] = None,
 ) -> Tuple[Optional[ndarray], Optional[int]]:
-    if dist == "flat":
+    if "flat" in dist:
         return None, n_modes
-    if dist == "unif":
+    elif "unif" in dist:
         p = rng.uniform(0, 1, size=n_classes)
         p /= p.sum()
         p = -np.sort(-p)
@@ -1028,10 +1028,12 @@ if __name__ == "__main__":
     # run_compare_raters()
     # run_compare_styles(n_iter=25000, mode="append")
     # run_compare_styles(n_iter=100_000, mode="cached")
+    # MODE = "overwrite"
+    MODE = "cached"
     run_compare_styles(
         n_iter=200_000,
-        mode="overwrite",
-        make_plots=True,
+        mode=MODE,
+        make_plots=False,
         print_descs=True,
         no_parallel=False,
     )
