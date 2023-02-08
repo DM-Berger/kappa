@@ -146,10 +146,17 @@ further.
 ## Metric Evaluation: Simulated
 
 No classifiers need actually be fit to examine the general behaviour of these
-metrics. In the general case, we have data $\symbfit{x}$ which we sample from
-a random variable $\mathcal{X}$. The class labels $\symbfit{y}$ for the data are distributed
-according to $\mathcal{Y}$, and we generally presume that $\mathcal{X}$ and $\mathcal{Y}$
-are dependent, such that there exists a true $F$ such that $F(\symbfit{x}) \approx \symbfit{y}$ (the equality is approximate because there may be )
+metrics. In the general case, we have data $\symbfit{x}$ which we model as sampled from a
+random variable $\mathcal{X}$. The class labels $\symbfit{y}$ for the data are
+distributed according to $\mathcal{Y}$, and we generally presume that
+$\mathcal{X}$ and $\mathcal{Y}$ are dependent, such that there exists a true
+$F$ such that either $\symbfit{y} = F(\symbfit{x})$, or $\symbfit{y} =
+F(\symbfit{x}) + \mathcal{E}(\symbfit{x})$, for unmodeled error or confounds
+$\mathcal{E}$. Fitting a classifier amounts to finding an $f$ that gets as close
+as possible to $F$ given data $(\symbfit{x}, \symbfit{y})$.
+
+That is, the distribution of errors for $\hat{\symbfit{y}}$
+depends
 
  That is, given a classifier $f$, repeated trainings and evaluations on
 some test data $\symbfit{x}$ will yield predictions $\hat{\symbfit{y}}_i$  with
