@@ -182,8 +182,8 @@ $\hat{\symbfit{y}}\_i$ be dependent on the true labels $\symbfit{y}$, or some
 proportion $r$ of samples, we can vary the classifier prediction (or error)
 consistency behaviour. For example, if each $\hat{\symbfit{y}}\_i$ is a
 *perturbation* of $\hat{\symbfit{y}}\_{\text{base}}$ (i.e. each element
-$\hat{\symbfit{y}}_i^{(j)}$ is either equal to
-$\hat{\symbfit{y}}_{\text{base}}^{(j)}$, or a class label sampled randomly from
+$\hat{\symbfit{y}}\_i^{(j)}$ is either equal to
+$\hat{\symbfit{y}}\_{\text{base}}^{(j)}$, or a class label sampled randomly from
 some distribution $\hat{\mathcal{Y}}$), then by varying the degree of
 perturbation, we can vary the consistency behaviour. As in the independent case,
 by varying the distribution of $\hat{\mathcal{Y}}$ relative to the observed
