@@ -143,38 +143,71 @@ they show largely identical behaviour to $\kappa$, and so are not discussed
 further.
 
 
-## Metric Evaluation: Simulated
+## Metric Evaluation
 
-No classifiers need actually be fit to examine the general behaviour of these
-metrics. In the general case, we have data $\symbfit{x}$ which we model as sampled from a
-random variable $\mathcal{X}$. The class labels $\symbfit{y}$ for the data are
-distributed according to $\mathcal{Y}$, and we generally presume that
-$\mathcal{X}$ and $\mathcal{Y}$ are dependent, such that there exists a true
-$F$ such that either $\symbfit{y} = F(\symbfit{x})$, or
-$\symbfit{y} = F(\symbfit{x}) + \mathcal{E}(\symbfit{x})$, for unmodeled error
-or confounds $\mathcal{E}$.  Fitting a classifier amounts to finding an $f$ that
-gets as close as possible to $F$ given data $(\symbfit{x}, \symbfit{y})$,
+### Simulations
 
-Thus the distribution of the predictions, $\hat{\mathcal{Y}}$, is dependent on
-the distributions of $\mathcal{E}$, $\mathcal{X}$, $F$, and the family of
-functions from which we select $f$.
+A preliminary examination of these metrics can be done without actual data or
+classifiers, by making a simplified model of the classification
+procedure. Namely:
+
+1. classification errors can be modeled as a random variable
+2. classification errors/predictions can be either dependent independent
+3. the errors of different classifiers can be simulated with different error distributions
+
+The first assumption is reasonable in that the overall pattern of errors of a
+classifier depends on sampling (e.g. number of outliers in the train/test sets),
+actual noise and/or systematic and non-systematic sources of error, and—if the
+classifier involves stochasticity—randomness from the algorithm itself. Thus,
+given a test set $\symbfit{y}$, it is reasonable to view the generation of a
+prediction $\hat{\symbfit{y}}$ as sampling from a random variable $\hat{\mathcal{Y}}$.
+
+The second assumption allows for modeling classifiers with variable prediction
+consistency behaviour: making test predictions
+$\hat{\symbfit{y}}_1, \dots, \hat{\symbfit{y}}_n$ be completely *i.i.d.* on a
+proportion $r$ of a test set simulates a classifier that makes completely
+random errors at a rate of $r$. Given test set class proportions
+$p_1, \dots, p_c$, we can define a discrete random variable $\hat{\mathcal{Y}}$.
+If the class probabilities for $\hat{\mathcal{Y}}$, $\hat{p}_1, \dots, \hat{p}_c$
+are such that $\hat{p}_i \sim p_i$, then this simulates a classifier
+which makes random errors, but which mass the observed class probabilities
+(meaning a metric like Cohen's $\kappa$, which assumes this behaviour, is
+well-suited for describing the relationships between $\hat{\symbfit{y}}_i$s).
+If, by contrast, $\hat{p}_i$s and $p_i$s differ, this simulates a classifier
+that makes *biased* random errors.
+
+By making test predictions be *dependent* (say, by having each
+$\hat{\symbfit{y}}_i$ be dependent on the true labels $\symbfit{y}$, or some
+"base" prediction $\hat{\symbfit{y}}_{\text{base}}$ which makes errors on a
+proportion $r$ of samples), we can vary the classifier prediction (or error)
+consistency behaviour. For example, if each $\hat{\symbfit{y}}_i$ is a
+*perturbation* of $\hat{\symbfit{y}}_{\text{base}}$ (i.e. each element
+$\hat{\symbfit{y}}_i^{(j)}$ is either equal to
+$\hat{\symbfit{y}}_{\text{base}}^{(j)}$, or a class label sampled randomly from
+some distribution $\hat{\mathcal{Y}}$), then by varying the degree of
+perturbation, we can vary the consistency behaviour. As in the independent case,
+by varying the distribution of $\hat{\mathcal{Y}}$ relative to the observed
+class probabilities, we can simulate bias in the (now dependent) errors.
 
 
- that
-is, we minimize
+#### Simulation Details
 
-$$
-\mathcal{L}(\symbfit{y}, \hat{\symbfit{y}}) =\mathcal{L}(\symbfit{y}, f(\symbfit{x}))
-$$
+Any investigation of reproducibility and/or model consistency must involve
+repeated evaluations. We define a **repetition** or **repeat** to consist of
+$k$ model **runs**. A **run** is a model evaluation that produces a single set
+of predictions on a test set that is shared (identical) across all runs within
+the repetition. The training sets and/or procedures may differ across runs
+within a repetition, however the test set must remain identical.
 
-However, across repeated trainings, which may differ either because $\symbfit{x}$
-differs (e.g. perturbation, resampling), or because the training procedure is
-varied (e.g. hyperparameter values are varied in some small way)
+For each repeat, we sample a random number of classes $c \in [2, 50]$. We then
+generate 1000 test labels $\symbfit{y}$ where each value of $\symbfit{y}$ is in
+$\{0, 1, \dots, c - 1\}$, by sampling from a random variable $\mathcal{Y}$
+which has class probabilities $p_1, \dots, p_c$. Without loss of generality, we
+force $p_1 \ge p_2 \ge \dots \ge p_c$, and then generate these class
+probabilities randomly randomly according to the various schemes described in
+[Appendix A](#appendix-a-generating-discrete-distributions).
 
-That is, the distribution of errors for $\hat{\symbfit{y}}$
-depends
 
- That is, given a classifier $f$, repeated trainings and evaluations on
 some test data $\symbfit{x}$ will yield predictions $\hat{\symbfit{y}}_i$  with
 correct labels $\symbfit{y}$ shared across evaluations. We can *ignore* $f$ and
 $\symbfit{x}$ here and model $\symbfit{y}$ as being sampled from a discrete
