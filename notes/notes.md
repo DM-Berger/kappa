@@ -172,8 +172,8 @@ If the class probabilities for $\hat{\mathcal{Y}}$, $\hat{p}_1, \dots, \hat{p}_c
 are such that $\hat{p}_i \sim p_i$, then this simulates a classifier
 which makes random errors, but which mass the observed class probabilities
 (meaning a metric like Cohen's $\kappa$, which assumes this behaviour, is
-well-suited for describing the relationships between $\hat{\symbfit{y}}_i$s).
-If, by contrast, $\hat{p}_i$s and $p_i$s differ, this simulates a classifier
+well-suited for describing the relationships between $\hat{\symbfit{y}}_i$ s).
+If, by contrast, $\hat{p}_i$ s and $p_i$ s differ, this simulates a classifier
 that makes *biased* random errors.
 
 By making test predictions be *dependent* (say, by having each
