@@ -152,8 +152,24 @@ distributed according to $\mathcal{Y}$, and we generally presume that
 $\mathcal{X}$ and $\mathcal{Y}$ are dependent, such that there exists a true
 $F$ such that either $\symbfit{y} = F(\symbfit{x})$, or
 $\symbfit{y} = F(\symbfit{x}) + \mathcal{E}(\symbfit{x})$, for unmodeled error
-or confounds $\mathcal{E}$. Fitting a classifier amounts to finding an $f$ that
-gets as close as possible to $F$ given data $(\symbfit{x}, \symbfit{y})$.
+or confounds $\mathcal{E}$.  Fitting a classifier amounts to finding an $f$ that
+gets as close as possible to $F$ given data $(\symbfit{x}, \symbfit{y})$,
+
+Thus the distribution of the predictions, $\hat{\mathcal{Y}}$, is dependent on
+the distributions of $\mathcal{E}$, $\mathcal{X}$, $F$, and the family of
+functions from which we select $f$.
+
+
+ that
+is, we minimize
+
+$$
+\mathcal{L}(\symbfit{y}, \hat{\symbfit{y}}) =\mathcal{L}(\symbfit{y}, f(\symbfit{x}))
+$$
+
+However, across repeated trainings, which may differ either because $\symbfit{x}$
+differs (e.g. perturbation, resampling), or because the training procedure is
+varied (e.g. hyperparameter values are varied in some small way)
 
 That is, the distribution of errors for $\hat{\symbfit{y}}$
 depends
