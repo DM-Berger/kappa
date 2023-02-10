@@ -6,14 +6,28 @@ useless intro junk].
 However, despite the impressive performance metrics produced by these DL models,
 the reproducibility of some of these results is @bouthillierUnreproducibleResearchReproducible2019
 
-Unfortunately, the focus on overall performance metrics like accuracies and
-perplexity scores ignores the question of the *consistency* or *stability* of
-those predictions on particular samples. While in some practical applications
-(say, recommendation systems), it might not matter if sample predictions change
-from update to update, or with each re-tuning, in other cases, this model
-drift [cite] may be unacceptable. In particular, any model predicting risks for
-human subjects (e.g. risk of defaulting on a loan, risk of developing a medical
-condition) should arguably be highly samplewise-consistent across updates.
+Unfortunately, the focus on aggregate performance metrics ignores the question
+of the *consistency* or *stability* of those predictions on particular samples.
+While in some practical applications (say, recommendation systems), it might
+not matter if sample predictions change from update to update, or with each
+re-tuning, in other cases, this model drift [cite] may be unacceptable. In
+particular, any model predicting risks for human subjects (e.g. risk of
+defaulting on a loan, risk of developing a medical condition) should arguably
+be highly samplewise-consistent across updates.
+
+## Related Work
+
+- model drift [@lacsonMachineLearningModel2022;
+  @nelsonEvaluatingModelDrift2015; @roffeDetectingModelDrift2021] and model
+  updating [@moonsRiskPredictionModels2012a;
+  @davisCalibrationDriftRegression2018; @davisCalibrationDriftRegression2017;
+  @minneEffectChangesTime2012]
+- robustness research, including adversarial robustness
+- bootstrapped error estimates
+- model churn and prediction difference
+
+
+## A Worked Example
 
 For example, in the most extreme pathological case, consider a fictional model
 which is consistently always 80% accurate in predicting a need for medical screening
@@ -44,26 +58,31 @@ metric which is a summary of the confusion matrix) is unchanged, but due to the 
 swap, 10 subjects that were *correctly* not recommended for screening last time are now
 recommended for screening, and, because of the a-c swap, the 10 subjects that were
 incorrectly *not* recommended for screening do correctly get recommended for
-screening this time. Except, now, with just one model update, the model has
-recommended the entire population for screening!
+screening this time. With just one model update, the model has
+recommended the entire population for screening! And this pathological behaviour
+is essentially invisible with aggregate performance metrics.
 
-Now, imagine each model update, when re-applied to these *same* subjects, cycles which
-of the subjects contribute to each of the "10" entries a-d in the confusion matrix.
+There are a number of important points to observe from this example:
+
+1. the pathological model behaviour arises in a repeated / iterated context
+2. the pathological behaviour requires a notion of persistent *individuality*
+   and *identifiability* of  the samples involved
+   - if prediction is done using a metric or set of features which does not
+     uniquely identify an individual, it is unclear if the above problem is a
+     concern
+3. the pathological behaviour is invisible from gross / aggregate metrics (accuracy
+   F1 score, etc.)
+4. the pathological behaviour also cannot be detected by comparing
+   the distributions of the class predictions across repetitions (the confusion
+   matrix is unaltered)
 
 
- (i.e. , but which makes errors
-on a completely different subset of samples with each model update. If
 
-## Related Work
 
-- model drift [@lacsonMachineLearningModel2022;
-  @nelsonEvaluatingModelDrift2015; @roffeDetectingModelDrift2021] and model
-  updating [@moonsRiskPredictionModels2012a;
-  @davisCalibrationDriftRegression2018; @davisCalibrationDriftRegression2017;
-  @minneEffectChangesTime2012]
-- robustness research, including adversarial robustness
-- bootstrapped error estimates
-- model churn and prediction difference
+
+
+
+
 
 # Reproducibility Metrics
 
