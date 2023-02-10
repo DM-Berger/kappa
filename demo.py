@@ -395,8 +395,15 @@ def get_p(
         p /= p.sum()
         p = -np.sort(-p)
     elif "exp" in dist:
-        scale = rng.uniform(1 / 10, 20)
-        p = np.linspace(0, 1, n_classes) ** scale
+        # we want 1 / pmin**20 = 100, so that the majority class is 100 times more likely
+        # than the minority. That is
+        # pmin**20 = (1/100) = 10**-2
+        # 20 * log10(pmin) = log10( 10**-2) = -2
+        # log10(pmin) = -0.1
+        # pmin = 10**-0.1 = 0.7943282347
+        pmin = 0.7943282347
+        scale = rng.uniform(0.1, 20)  # 0.1 is almost like a uniform, visually
+        p = np.linspace(pmin, 1, n_classes) ** scale
         p /= p.sum()
         p = -np.sort(-p)
     elif "step" in dist:
@@ -406,6 +413,18 @@ def get_p(
     if "-r" in dist:
         p = np.sort(p)
     return p, n_modes
+
+
+def rejection_sample(
+    classes: List[int], size: int, p: Optional[ndarray], rng: Generator
+) -> ndarray:
+    """Use rejection sampling to throw out samples missing some class labels"""
+    samples = rng.choice(classes, size=size, p=p)
+    counts = np.bincount(samples, minlength=classes[-1] + 1)
+    while np.any(counts == 0):
+        samples = rng.choice(classes, size=size, p=p)
+        counts = np.bincount(samples, minlength=classes[-1] + 1)
+    return samples
 
 
 def compare_error_styles(args: Namespace) -> Tuple[DataFrame, DataFrame]:
@@ -437,7 +456,8 @@ def compare_error_styles(args: Namespace) -> Tuple[DataFrame, DataFrame]:
 
     CLASSES = list(range(n_classes))
     yp, n_modes = get_p(ydist, n_classes, rng)
-    y = rng.choice(CLASSES, size=N, p=yp)  # y_true
+    # we really do need to ensure all classes are present in `y` for sim to make sense
+    y = rejection_sample(classes=CLASSES, size=N, p=yp, rng=rng)
     ys = [y.copy() for _ in range(5)]
     n_max_err = ceil(s * len(y))
     err_max_idx = rng.permutation(len(y))[:n_max_err]
@@ -466,7 +486,9 @@ def compare_error_styles(args: Namespace) -> Tuple[DataFrame, DataFrame]:
     elif error_style == "dependent":
         # In this case, predictions are dependent upon a base set of predictions.
         # This means error sets will be dependent (likely correlated) too.
-        # Here, `r` essentially determines the independence
+        # Here, `r` essentially determines the independence. We do NOT use
+        # rejection sampling here, because it need not be the case that an
+        # algorithm always predicts at least one label from each class.
         pred_base = rng.choice(CLASSES, size=n_max_err, p=p)
         for yy in ys:
             pred_rand = rng.choice(CLASSES, size=n_max_err, p=p)

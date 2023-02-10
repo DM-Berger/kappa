@@ -28,6 +28,7 @@ OUTDIR.mkdir(exist_ok=True, parents=True)
 
 def make_plot() -> None:
     SEED = 9
+    N = 10000
     print(SEED)
     n_classes = 10
     classes = list(range(n_classes))
@@ -48,7 +49,7 @@ def make_plot() -> None:
             p = get_p(
                 dist=dist, n_classes=n_classes, rng=rng, n_modes=rng.choice([3, 4, 5])
             )[0]
-            y = rng.choice(classes, size=1000, replace=True, p=p)
+            y = rng.choice(classes, size=N, replace=True, p=p)
             bins = ax.hist(
                 y, color="black", bins=list(range(n_classes + 1)), edgecolor="white"
             )[1]
@@ -63,12 +64,12 @@ def make_plot() -> None:
             ax.set_xlim(0, n_classes)
     fig.set_size_inches(h=5, w=8.5)
     fig.suptitle(
-        r"1000 Sampled Class Frequencies from Random $\mathcal{Y}$ Distributions According to Scheme"
+        rf"{N} Sampled Class Frequencies from Random $\mathcal{{Y}}$ Distributions According to Scheme"
     )
     fig.text(x=0.5, y=0.01, s="Class")
     fig.text(y=0.5, x=0.01, s="Number of samples", rotation="vertical", va="center")
     fig.tight_layout()
-    fig.subplots_adjust(left=0.075, bottom=0.09)
+    fig.subplots_adjust(left=0.085, bottom=0.09)
     outfile = OUTDIR / "sample_p_distributions.png"
     fig.savefig(str(outfile), dpi=600)
     print(f"Saved plot to {outfile}")

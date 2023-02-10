@@ -205,18 +205,20 @@ $\{0, 1, \dots, c - 1\}$, by sampling from a random variable $\mathcal{Y}$
 which has class probabilities $p_1, \dots, p_c$. Without loss of generality, we
 force $p_1 \ge p_2 \ge \dots \ge p_c$, and then generate these class
 probabilities randomly randomly according to the various schemes described in
-[Appendix A](#appendix-a-generating-discrete-distributions).
+[Appendix A](#appendix-a-generating-discrete-distributions) or the [source
+code `get_p` function](https://github.com/DM-Berger/kappa/blob/master/demo.py#L353-L408).
+Most notably, we end up with *four distinct families of distributions for
+$\mathcal{Y}$*, ordered from least to most skewed $p_i$ distributions: **balanced**,
+**uniform**, **multi-modal**, and **exponential**:
+
+![Example true label distributions](../figures/sample_p_distributions.png)
+
+**Figure 1. Simulated true label distributions**. Each subplot depicts the
+distribution of a random $\symbfit{y}$ sampled from a distribution $\mathcal{Y}$
+defined by the scheme in the column title.
 
 
-some test data $\symbfit{x}$ will yield predictions $\hat{\symbfit{y}}_i$  with
-correct labels $\symbfit{y}$ shared across evaluations. We can *ignore* $f$ and
-$\symbfit{x}$ here and model $\symbfit{y}$ as being sampled from a discrete
-random variable $\mathcal{Y}$  with possible values $\{0, 1, ..., c-1\}$ for $c$
-classes, and corresponding probabilities $\{p_1, \dots p_c\}$. We can model the
-predictions $\hat{\symbfit{y}}_i$ as samples from a different discrete random variable
-$\hat{\mathcal{Y}}$. The we can investigate the behaviour of various
-reproducibility metrics by specifying different distributions and relationships
-for $\mathcal{Y}$ and $\hat{\mathcal{Y}}$.
+
 
 We can further add thoroughness to the simulation by specifying the $p_i$
 values probabilistically. That is, we can choose a distribution $\mathcal{D}$
