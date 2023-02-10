@@ -49,17 +49,17 @@ def get_exp_p(n_classes: int, rng: Generator, max_scale: float = 20) -> ndarray:
     return p
 
 
-def plot_samples() -> None:
+def plot_samples(dist: str) -> None:
     rng = np.random.default_rng()
     fig, axes = plt.subplots(nrows=8, ncols=14)
     for ax in axes.flat:
         n_classes = int(rng.integers(3, 50, size=[1]))
         n_modes = rng.integers(0, ceil(n_classes / 5)) if "multi" in dist else None
-        # ps, modes = get_p(dist=dist, n_classes=n_classes, rng=rng, n_modes=n_modes)
-        ps = get_exp_p(n_classes=n_classes, rng=rng)
+        ps, modes = get_p(dist=dist, n_classes=n_classes, rng=rng, n_modes=n_modes)
+        # ps = get_exp_p(n_classes=n_classes, rng=rng)
         classes = list(range(n_classes))
         # samples = rng.choice(classes, p=ps, size=1000)
-        samples = rejection_sample(classes=classes, size=1000, p=ps, rng=rng)
+        samples = rejection_sample(classes=classes, dist=dist, size=1000, p=ps, rng=rng)
         ax.hist(
             samples, bins=list(range(n_classes + 1)), color="black", edgecolor="white"
         )
@@ -78,6 +78,6 @@ def plot_samples() -> None:
 
 if __name__ == "__main__":
     # for dist in Y_DIST_ORDER:
-    # for dist in ["balanced", "unif", "exp"]:
-    for dist in ["exp"]:
-        plot_samples()
+    # for dist in ["exp"]:
+    for dist in ["balanced", "unif", "exp", "multimodal"]:
+        plot_samples(dist)
