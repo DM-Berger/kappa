@@ -1,3 +1,30 @@
+# Introduction
+
+Deep learning with neural networks (DL) has yielded remarkable advances in [bla bla bla, more
+useless intro junk].
+
+However, despite the impressive performance metrics produced by these DL models,
+the reproducibility of some of these results is @bouthillierUnreproducibleResearchReproducible2019
+
+Unfortunately, the focus on overall performance metrics like accuracies and perplexity
+scores ignores the question of the *consistency* or *stability* of those predictions
+on particular samples. While in some practical applications, it might not matter if
+sample predictions change from update to update, or with each re-tuning, in many other
+cases, this model drift [cite] may be unacceptable. In particular, any model predicting
+risks for human subjects (e.g. risk of defaulting on a loan, risk of developing a
+medical condition) should arguably
+
+## Related Work
+
+- model drift [@lacsonMachineLearningModel2022;
+  @nelsonEvaluatingModelDrift2015; @roffeDetectingModelDrift2021] and model
+  updating [@moonsRiskPredictionModels2012a;
+  @davisCalibrationDriftRegression2018; @davisCalibrationDriftRegression2017;
+  @minneEffectChangesTime2012]
+- robustness research, including adversarial robustness
+- bootstrapped error estimates
+- model churn and prediction difference
+
 # Reproducibility Metrics
 
 For a metric to be a useful prediction reproducibility or reliability metric, it
@@ -145,7 +172,9 @@ further.
 
 ## Metric Evaluation
 
-### Simulations
+What makes a good sample-wise reproducibility metric?
+
+## Simulations
 
 A preliminary examination of these metrics can be done without actual data or
 classifiers, by making a simplified model of the classification
@@ -190,7 +219,7 @@ by varying the distribution of $\hat{\mathcal{Y}}$ relative to the observed
 class probabilities, we can simulate bias in the (now dependent) errors.
 
 
-#### Simulation Details
+### Simulation Details
 
 Any investigation of reproducibility and/or model consistency must involve
 repeated evaluations. We define a **repetition** or **repeat** to consist of
@@ -361,3 +390,6 @@ scientist), one would most likely fit a classifier to data with e.g. N classes,
 but where $n \ll N$ classes make up the vast majority of the samples. Instead,
 one would (hopefully) first try to separate the majority class from the minority
 classes, and then apply a separate classification
+
+
+# References

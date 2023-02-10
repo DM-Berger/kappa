@@ -1,9 +1,9 @@
 #!/bin/bash
 IN=notes.md
-BIB=notes.bib
+BIB=reproducible_dl.bib
 OUT=notes.html
 STYLE=mdstyle.html
-CITESTYLE=apa.csl
+CITESTYLE=ieee.csl
 
 # --citeproc: process citations in --bibliography
 # --mathjax: include mathjax js
@@ -30,7 +30,7 @@ pandoc \
     --metadata link-bibliography=true \
     --metadata lang=en-US \
     -f markdown+citations -t html $IN \
-    --metadata pagetitle="Notes" \
+    --metadata pagetitle="Pairwise Prediction Reproducibility Metrics" \
     -H $STYLE \
     -s -o $OUT
 echo -n "Built at $(date): " &&\
