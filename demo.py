@@ -1,5 +1,7 @@
+import os
 import re
 import sys
+import traceback
 from argparse import Namespace
 from functools import reduce
 from itertools import combinations
@@ -13,7 +15,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sbn
-from irrCAC.raw import CAC
+from joblib import Parallel, delayed
+
+# from irrCAC.raw import CAC
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from numpy import ndarray
@@ -177,7 +181,7 @@ def get_stats(
     pas = [acc(*comb) for comb in y_combs]  # Percent Agreement
     e_corrs = [np.corrcoef(*comb)[0, 1] for comb in y_combs]
     e_vs = [cramer_v(*comb) for comb in y_combs]
-    e_bvs = [cramer_v(*comb) for comb in e_combs]
+    # e_bvs = [cramer_v(*comb) for comb in e_combs]
     e_bcorrs = [np.corrcoef(*comb)[0, 1] for comb in e_combs]
 
     e_corr = np.mean(e_corrs)
@@ -204,11 +208,11 @@ def get_stats(
     ecls = [ec_local(y, *comb) for comb in y_combs]
     ecus = [ec_union(y, *comb) for comb in y_combs]
     unions = [ecu * N for ecu in ecus]
-    Cs = [confusion(y, yy, labels=list(range(n_classes))) for yy in ys]
+    # Cs = [confusion(y, yy, labels=list(range(n_classes))) for yy in ys]
     # C_12_accs = [np.mean(C1 == C2) for C1, C2 in combinations(Cs, 2)]
     ks = [kappa(*comb) for comb in y_combs]
     kes = [kappa(*comb) for comb in e_combs]
-    kys = [kappa(y, yy) for yy in ys]
+    # kys = [kappa(y, yy) for yy in ys]
 
     ec_r = np.mean(ec_rs)
     # ec_br = np.mean(ec_brs)
@@ -288,7 +292,7 @@ def get_stats(
         names.append(f"r({cs.iloc[i, 0]}, {cs.iloc[i, 1]})")
     cs["corr"] = names
     cs = cs.loc[:, ["corr", "r"]]
-    cs.index = cs["corr"]
+    cs.index = cs["corr"]  # type: ignore
     cs.drop(columns="corr", inplace=True)
 
     stats = {
@@ -373,7 +377,7 @@ def get_p(
     if "flat" in dist:
         return None, n_modes
     elif "unif" in dist:
-        p = rng.uniform(0, 1, size=n_classes)
+        p = rng.uniform(0.01, 1, size=n_classes)
         p /= p.sum()
         p = -np.sort(-p)
         return p, n_modes
@@ -416,18 +420,28 @@ def get_p(
 
 
 def rejection_sample(
-    classes: List[int], size: int, p: Optional[ndarray], rng: Generator
+    classes: List[int], dist: str, size: int, p: Optional[ndarray], rng: Generator
 ) -> ndarray:
     """Use rejection sampling to throw out samples missing some class labels"""
     samples = rng.choice(classes, size=size, p=p)
     counts = np.bincount(samples, minlength=classes[-1] + 1)
+    attempts = 1
     while np.any(counts == 0):
+        if attempts > 100:
+            break
+        attempts += 1
         samples = rng.choice(classes, size=size, p=p)
         counts = np.bincount(samples, minlength=classes[-1] + 1)
+    if attempts >= 100:
+        print(f"Could not rejection sample for dist {dist} in 100 iters.\n" f"p={p}.")
+        raise RuntimeError(
+            f"Could not rejection sample for dist {dist} in 100 iters.\n" f"p={p}."
+        )
+
     return samples
 
 
-def compare_error_styles(args: Namespace) -> Tuple[DataFrame, DataFrame]:
+def compare_error_styles(args: Namespace) -> Optional[Tuple[DataFrame, DataFrame]]:
     """Compare ECs and Kappa-based agreement where errors are generated in two ways
 
     Also parameter s, max error set size.
@@ -445,88 +459,95 @@ def compare_error_styles(args: Namespace) -> Tuple[DataFrame, DataFrame]:
 
 
     """
-    filterwarnings("ignore", category=RuntimeWarning)
-    r = args.r  # value in [0, 1]
-    s = args.err_size  # value in [0, 1]
-    edist = args.edist
-    ydist = args.ydist
-    error_style = args.errors
-    n_classes = args.n_classes
-    rng = np.random.default_rng(seed=args.seed)
+    try:
+        filterwarnings("ignore", category=RuntimeWarning)
+        r = args.r  # value in [0, 1]
+        s = args.err_size  # value in [0, 1]
+        edist = args.edist
+        ydist = args.ydist
+        error_style = args.errors
+        n_classes = args.n_classes
+        rng = np.random.default_rng(seed=args.seed)
 
-    CLASSES = list(range(n_classes))
-    yp, n_modes = get_p(ydist, n_classes, rng)
-    # we really do need to ensure all classes are present in `y` for sim to make sense
-    y = rejection_sample(classes=CLASSES, size=N, p=yp, rng=rng)
-    ys = [y.copy() for _ in range(5)]
-    n_max_err = ceil(s * len(y))
-    err_max_idx = rng.permutation(len(y))[:n_max_err]
-    if "multi" in ydist and "multi" in edist:
-        # force same number of modes
-        p = get_p(edist, n_classes, rng, n_modes=n_modes)[0]
-    else:
-        p = get_p(edist, n_classes, rng)[0]
+        CLASSES = list(range(n_classes))
+        yp, n_modes = get_p(ydist, n_classes, rng)
+        # we really do need to ensure all classes are present in `y` for sim to make sense
+        y = rejection_sample(classes=CLASSES, dist=ydist, size=N, p=yp, rng=rng)
+        ys = [y.copy() for _ in range(5)]
+        n_max_err = ceil(s * len(y))
+        err_max_idx = rng.permutation(len(y))[:n_max_err]
+        if "multi" in ydist and "multi" in edist:
+            # force same number of modes
+            p = get_p(edist, n_classes, rng, n_modes=n_modes)[0]
+        else:
+            p = get_p(edist, n_classes, rng)[0]
 
-    y_errs = []
-    idxs = []  # binary errors on error set only
-    if error_style == "independent":
-        # In this cases, predictions are on the same subset of the max error set,
-        # but predictions are made completely independently according to the
-        # distribution `dist`. `r`` is error difference (high r means very
-        # different error sets) because `r` controls how much of the max error
-        # set errors occur on.
-        err_size = ceil(r * n_max_err)
-        for yy in ys:
-            # ensure all errors
-            idx = rng.permutation(n_max_err)[:err_size]
-            y_err = rng.choice(CLASSES, size=err_size, p=p)
-            yy[idx] = y_err
-            y_errs.append(y_err)
-            idxs.append(idx)
-    elif error_style == "dependent":
-        # In this case, predictions are dependent upon a base set of predictions.
-        # This means error sets will be dependent (likely correlated) too.
-        # Here, `r` essentially determines the independence. We do NOT use
-        # rejection sampling here, because it need not be the case that an
-        # algorithm always predicts at least one label from each class.
-        pred_base = rng.choice(CLASSES, size=n_max_err, p=p)
-        for yy in ys:
-            pred_rand = rng.choice(CLASSES, size=n_max_err, p=p)
-            # Large r means make more predictions random,  so less similar, and
-            # more indepedent. Essentially, err_idx below determines which
-            # samples are given random predictions.
-            # So as r -> 1, almost all samples get a prediction from pred_base,
-            # i.e. all predictions become the same, and are completely dependent.
-            # As r -> 0, all predictions are completely random, so independent.
+        y_errs = []
+        idxs = []  # binary errors on error set only
+        if error_style == "independent":
+            # In this cases, predictions are on the same subset of the max error set,
+            # but predictions are made completely independently according to the
+            # distribution `dist`. `r`` is error difference (high r means very
+            # different error sets) because `r` controls how much of the max error
+            # set errors occur on.
+            err_size = ceil(r * n_max_err)
+            for yy in ys:
+                # ensure all errors
+                idx = rng.permutation(n_max_err)[:err_size]
+                y_err = rng.choice(CLASSES, size=err_size, p=p)
+                yy[idx] = y_err
+                y_errs.append(y_err)
+                idxs.append(idx)
+        elif error_style == "dependent":
+            # In this case, predictions are dependent upon a base set of predictions.
+            # This means error sets will be dependent (likely correlated) too.
+            # Here, `r` essentially determines the independence. We do NOT use
+            # rejection sampling here, because it need not be the case that an
+            # algorithm always predicts at least one label from each class.
+            pred_base = rng.choice(CLASSES, size=n_max_err, p=p)
+            for yy in ys:
+                pred_rand = rng.choice(CLASSES, size=n_max_err, p=p)
+                # Large r means make more predictions random,  so less similar, and
+                # more indepedent. Essentially, err_idx below determines which
+                # samples are given random predictions.
+                # So as r -> 1, almost all samples get a prediction from pred_base,
+                # i.e. all predictions become the same, and are completely dependent.
+                # As r -> 0, all predictions are completely random, so independent.
 
-            base_idx = rng.choice([True, False], size=n_max_err, p=[1 - r, r])
-            rand_idx = ~base_idx
-            preds = np.concatenate([pred_base[base_idx], pred_rand[rand_idx]])
-            yy[err_max_idx] = preds
+                base_idx = rng.choice([True, False], size=n_max_err, p=[1 - r, r])
+                rand_idx = ~base_idx
+                preds = np.concatenate([pred_base[base_idx], pred_rand[rand_idx]])
+                yy[err_max_idx] = preds
 
-            # y_err = pred_base[err_idx]
-            # final_idx = err_max_idx[err_idx]
-            # yy[final_idx] = y_err
-            y_errs.append(yy[err_max_idx])
-            idxs.append(err_max_idx)
+                # y_err = pred_base[err_idx]
+                # final_idx = err_max_idx[err_idx]
+                # yy[final_idx] = y_err
+                y_errs.append(yy[err_max_idx])
+                idxs.append(err_max_idx)
 
-    else:
-        raise ValueError()
+        else:
+            raise ValueError(f"Unrecognized error style: {error_style}")
 
-    extra = DataFrame(
-        {
-            "n_cls": n_classes,
-            "edist": edist,
-            "ydist": ydist,
-            "errors": error_style,
-            "r": r,
-            "s": s,
-            "sr": s * r,
-        },
-        index=[0],
-    )
-    df, corrs = get_stats(y=y, ys=ys, y_errs=y_errs, err_idx=idxs, n_classes=n_classes)
-    return pd.concat([extra, df], axis=1), corrs
+        extra = DataFrame(
+            {
+                "n_cls": n_classes,
+                "edist": edist,
+                "ydist": ydist,
+                "errors": error_style,
+                "r": r,
+                "s": s,
+                "sr": s * r,
+            },
+            index=[0],
+        )
+        df, corrs = get_stats(
+            y=y, ys=ys, y_errs=y_errs, err_idx=idxs, n_classes=n_classes
+        )
+        return pd.concat([extra, df], axis=1), corrs
+    except Exception as e:
+        traceback.print_exc()
+        print(f"Got error: {e}")
+        return None
 
 
 def get_df(
@@ -559,14 +580,23 @@ def get_df(
     if mode == "append" and (not DF_OUT.exists()):
         mode = "overwrite"
 
+    chunks = dict(chunksize=1) if os.environ.get("ccluster") == "niagara" else {}
     if DF_OUT.exists() and CORRS_OUT.exists() and mode == "cached":
+        print("Loading cached data ... ", end="", flush=True)
         df_all = pd.read_parquet(DF_OUT)
         c_all = pd.read_parquet(CORRS_OUT)
+        print("done")
     elif mode == "overwrite":
+        print("Generating new data to overwrite existing data...")
         if no_parallel:
-            dfs, corrs = list(zip(*map(compare_error_styles, GRID)))
+            all_results = list(map(compare_error_styles, tqdm(GRID)))
         else:
-            dfs, corrs = list(zip(*process_map(compare_error_styles, GRID, chunksize=1)))
+            all_results = Parallel(n_jobs=8, verbose=1, backend="multiprocessing")(
+                delayed(compare_error_styles)(args) for args in GRID
+            )
+            # all_results = process_map(compare_error_styles, GRID, **chunks, desc="sdosdo")
+        results = [r for r in all_results if r is not None]
+        dfs, corrs = list(zip(*results))
         df_all = pd.concat(dfs, axis=0, ignore_index=True)
         corrs_all = pd.concat(corrs, axis=0, ignore_index=True)
         c_all = pd.concat(
@@ -583,9 +613,11 @@ def get_df(
         c_old = pd.read_parquet(CORRS_OUT)
 
         if no_parallel:
-            dfs, corrs = list(zip(*map(compare_error_styles, GRID)))
+            all_results = list(map(compare_error_styles, tqdm(GRID)))
         else:
-            dfs, corrs = list(zip(*process_map(compare_error_styles, GRID, chunksize=1)))
+            all_results = process_map(compare_error_styles, GRID, **chunks)
+        results = [r for r in all_results if r is not None]
+        dfs, corrs = list(zip(*results))
         df_all = pd.concat(dfs, axis=0, ignore_index=True)
         corrs_all = pd.concat(corrs, axis=0, ignore_index=True)
         c_all = pd.concat(
@@ -814,7 +846,7 @@ def plot_metric_distributions(df: DataFrame) -> None:
         kind="violin",
         split=True,
         height=4,
-        aspect=0.75,
+        aspect=0.75,  # type: ignore
         linewidth=0.5,
     )
     grid.set_titles("{row_name}-y vs {col_name}-errs")
@@ -975,7 +1007,7 @@ def run_compare_styles(
     dfr.rename(columns={"errors": "is_independent"}, inplace=True)
     print(
         dfr.groupby(["is_independent", "ydist", "edist"])
-        .corrwith(dfr["Mean Accuracy"])
+        .corrwith(dfr["Mean Accuracy"], numeric_only=True)  # type: ignore
         .loc[:, metrics]
     )
     df_metrics = pd.melt(
@@ -993,7 +1025,7 @@ def run_compare_styles(
     )
     cs = (
         dfr.groupby(["is_independent", "ydist", "edist"])
-        .corrwith(dfr["Mean Accuracy"])
+        .corrwith(dfr["Mean Accuracy"], numeric_only=True)  # type: ignore
         .loc[:, metrics]
         .reset_index()
         .drop(columns=["ydist", "edist"])
@@ -1001,13 +1033,13 @@ def run_compare_styles(
         .describe(percentiles=[0.05, 0.25])
         .T
     )
-    c_descs = cs.T.loc[:, (slice(None), ["mean", "min", "5%", "25%", "max"])]
+    c_descs = cs.T.loc[:, (slice(None), ["mean", "min", "5%", "25%", "max"])]  # type: ignore # noqa
     print("Metric correlations with (useless) mean accuracy:")
     print(c_descs.T.unstack())
 
     cs = (
         dfr.groupby(["is_independent", "ydist", "edist"])
-        .corrwith(dfr["a_rng"])  # a_rrng no different really
+        .corrwith(dfr["a_rng"], numeric_only=True)  # type: ignore  # a_rrng no different really
         .loc[:, metrics]
         .reset_index()
         .drop(columns=["ydist", "edist"])
@@ -1015,12 +1047,12 @@ def run_compare_styles(
         .describe(percentiles=[0.05, 0.25])
         .T
     )
-    c_descs = cs.T.loc[:, (slice(None), ["mean", "min", "5%", "25%", "max"])]
+    c_descs = cs.T.loc[:, (slice(None), ["mean", "min", "5%", "25%", "max"])]  # type: ignore  # noqa
     print("Metric correlations with accuracy range:")
     print(c_descs.T.unstack())
 
     cs = (
-        dfr.loc[dfr["is_independent"].groupby(["ydist", "edist"]) == 0]
+        dfr.loc[dfr["is_independent"] == 0].groupby(["ydist", "edist"])
         .corrwith(dfr["Error independence"])
         .loc[:, metrics]
         .reset_index()
@@ -1029,7 +1061,12 @@ def run_compare_styles(
         .T
     )
     print("Metric correlations with level of dependence:")
-    print(cs.unstack())
+    print(cs)
+
+    # TODO
+    # 1. Look at correlation with s, and s*r
+    # 2. Look at correlation with s, r, and others for smaller s,  larger mean acc, and larger
+    #    r to simulate more reasonable scenarios
 
     return
 
@@ -1050,12 +1087,13 @@ if __name__ == "__main__":
     # run_compare_raters()
     # run_compare_styles(n_iter=25000, mode="append")
     # run_compare_styles(n_iter=100_000, mode="cached")
-    # MODE = "overwrite"
-    MODE = "cached"
+    MODE = "overwrite"
+    # MODE = "cached"
+    print("Preparing...")
     run_compare_styles(
-        n_iter=200_000,
+        n_iter=500_000,
         mode=MODE,
-        make_plots=False,
+        make_plots=True,
         print_descs=True,
         no_parallel=False,
     )
