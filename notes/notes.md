@@ -74,7 +74,8 @@ There are a number of important points to observe from this example:
    F1 score, etc.)
 4. the pathological behaviour also cannot be detected by comparing
    the distributions of the class predictions across repetitions (the confusion
-   matrix is unaltered)
+   matrix is unaltered, and in fact the observed prediction distributions are
+   unaltered)
 
 
 
@@ -84,7 +85,20 @@ There are a number of important points to observe from this example:
 
 
 
-# Reproducibility Metrics
+# Consistency Metrics
+
+Thus, any metric that can be used to detect this problem *must* either:
+
+1. must make use of sample individuality (e.g. a unique identifier), OR
+1. be sensitive to the ordering of the samples
+
+An $n$-arity samplewise consistency metric $m(\hat{y}_1, \dots, \hat{y}_n) \ge 0$:  must satisfy:
+
+$$\begin{align*}
+ \quad \hat{y}_i \ne \hat{y}_j \; & \forall i \ne j & \implies m(\hat{y}_1, \dots, \hat{y}_n) < 1 \\
+ \quad \hat{y}_i = \hat{y}_j \;  & \forall i, j & \implies m(\hat{y}_1, \dots, \hat{y}_n) = 1 \\
+\end{align*}$$
+
 
 For a metric to be a useful prediction reproducibility or reliability metric, it
 should have the following qualities:
@@ -227,6 +241,29 @@ which is a correlation in $[0, 1]$ based on the $\chi^2$.
 **Note**: I also tested **Krippendorf's** $\alpha$, and Gwet's **AC1/2**, but
 they show largely identical behaviour to $\kappa$, and so are not discussed
 further.
+
+### Point-Process or Process-Based
+
+Each sample can be viewed as a particle, and each predicted class its position in
+one-hot space $\{0, 1\}^c$.
+
+Or, each sample can be viewed as a discrete random variable with class probabilities
+$p_1, \dots, p_c$. In this case, taking the observed class predictions proportions
+as estimates of the true probability, we can compute the Shannon entropy of each
+sample (just a weighted average of the $p_i$, where each weight is $-\log p_i$).
+Since 0 entropy represents one and only one $p_i = 1$, and since entropy > 0
+however, entropy is dependent on the number of possible states, so we may want
+to normalize it by division by $\log(c)$. Also, it will require a lot of runs
+to get a get estimate for entropy $H$, so instead we likely want to talk about
+the entropy of the errors $e_i$, and not of the class predictions.
+
+In addition, we may simply want to get the number of uniquely
+predicted classes for each sample (divided by $c$ to normalize, and subtracted from 1 to make 1 = high consistency).
+
+
+
+
+
 
 
 ## Metric Evaluation

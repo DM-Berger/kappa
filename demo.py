@@ -69,7 +69,17 @@ E_DIST_ORDER = [
     # "bimodal-r",
 ]
 
-METRICS = METRIC_ORDER = ["pa", "ec_g", "ec_gi", "ec_l", "e_corr", "K", "e_v"]
+METRICS = METRIC_ORDER = [
+    "pa",
+    "ec_g",
+    "ec_gi",
+    "ec_l",
+    "ecl_rng",
+    "ecl_rrng",
+    "e_corr",
+    "K",
+    "e_v",
+]
 DEPENDENCES = DEPENDENCE_ORDER = ["independent", "dependent"]
 RENAMES = {
     "pa": "Percent Agreement",
@@ -77,6 +87,8 @@ RENAMES = {
     "ec_g": "EC (acc)",
     "ec_gi": "EC (global)",
     "ec_l": "EC (local)",
+    "ecl_rng": "EC range (local)",
+    "ecl_rrng": "EC r-range (local)",
     "e_corr": "EC (corr)",
     "K": "EA (kappa)",
     "e_v": "EA (Cramer's V)",
@@ -1128,13 +1140,12 @@ if __name__ == "__main__":
     # run_compare_raters()
     # run_compare_styles(n_iter=25000, mode="append")
     # run_compare_styles(n_iter=100_000, mode="cached")
-    MODE = "overwrite"
-    # MODE = "cached"
-    print("Preparing...")
+    # MODE = "overwrite"
+    MODE = "cached"
     run_compare_styles(
         n_iter=500_000,
         mode=MODE,
-        make_plots=True,
+        make_plots=False,
         print_descs=True,
         no_parallel=False,
     )
