@@ -7,10 +7,9 @@ from functools import reduce
 from itertools import combinations
 from math import ceil
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union, cast, no_type_check
+from typing import Any, Dict, List, Optional, Tuple
 from warnings import filterwarnings
 
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -33,6 +32,7 @@ from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
 from typing_extensions import Literal
 
+# import matplotlib
 # matplotlib.use("QtAgg")
 
 
@@ -582,7 +582,7 @@ def get_df(
 
     chunks = dict(chunksize=1) if os.environ.get("ccluster") == "niagara" else {}
     if DF_OUT.exists() and CORRS_OUT.exists() and mode == "cached":
-        print("Loading cached data ... ", end="", flush=True)
+        print("Loading cached data... ")
         df_all = pd.read_parquet(DF_OUT)
         c_all = pd.read_parquet(CORRS_OUT)
         print("done")
@@ -594,7 +594,7 @@ def get_df(
             all_results = Parallel(n_jobs=8, verbose=1, backend="multiprocessing")(
                 delayed(compare_error_styles)(args) for args in GRID
             )
-            # all_results = process_map(compare_error_styles, GRID, **chunks, desc="sdosdo")
+            # all_results = process_map(compare_error_styles, GRID, **chunks)
         results = [r for r in all_results if r is not None]
         dfs, corrs = list(zip(*results))
         df_all = pd.concat(dfs, axis=0, ignore_index=True)
@@ -906,6 +906,67 @@ def print_core_tables(df: DataFrame) -> None:
         ddf = DataFrame({"range": rng, "rrange": rrng}, index=desc.index)
 
 
+def print_main_correlations(df_renamed: DataFrame, restriction: str = "") -> None:
+    dfr = df_renamed
+    metrics = [RENAMES[m] if m in RENAMES else m for m in METRICS]
+    desc = "" if restriction == "" else f" (restriction: {restriction})"
+
+    cs = (
+        dfr.groupby(["is_independent", "ydist", "edist"])
+        .corrwith(dfr["Mean Accuracy"], numeric_only=True)  # type: ignore
+        .loc[:, metrics]
+        .reset_index()
+        .drop(columns=["ydist", "edist"])
+        .groupby("is_independent")
+        .describe(percentiles=[0.05, 0.25])
+        .T
+    )
+    c_descs = cs.T.loc[:, (slice(None), ["mean", "min", "5%", "25%", "max"])]  # type: ignore # noqa
+    print(f"Metric correlations with (useless) mean accuracy{desc}:")
+    print(c_descs.T.unstack())
+
+    # a_rrng is no different than below, corrs not due to outliers
+    cs = (
+        dfr.groupby(["is_independent", "ydist", "edist"])
+        .corrwith(dfr["a_rng"], numeric_only=True)  # type: ignore
+        .loc[:, metrics]
+        .reset_index()
+        .drop(columns=["ydist", "edist"])
+        .groupby("is_independent")
+        .describe(percentiles=[0.05, 0.25])
+        .T
+    )
+    c_descs = cs.T.loc[:, (slice(None), ["mean", "min", "5%", "25%", "max"])]  # type: ignore  # noqa
+    print(f"Metric correlations with accuracy range{desc}:")
+    print(c_descs.T.unstack())
+
+    cs = (
+        dfr.loc[dfr["is_independent"] == 0]
+        .groupby(["ydist", "edist"])
+        .corrwith(dfr["Error independence"], numeric_only=True)  # type: ignore
+        .loc[:, metrics]
+        .reset_index()
+        .drop(columns=["ydist", "edist"])
+        .describe(percentiles=[0.05, 0.25])
+        .T
+    )
+    print(f"Metric correlations with level of dependence:{desc}")
+    print(cs)
+
+    cs = (
+        dfr.loc[dfr["is_independent"] == 0]
+        .groupby(["ydist", "edist"])
+        .corrwith(dfr["Error set max size"], numeric_only=True)  # type: ignore
+        .loc[:, metrics]
+        .reset_index()
+        .drop(columns=["ydist", "edist"])
+        .describe(percentiles=[0.05, 0.25])
+        .T
+    )
+    print(f"Metric correlations with error set max size:{desc}")
+    print(cs)
+
+
 def run_compare_styles(
     n_iter: int = 25000,
     mode: Literal["append", "overwrite", "cached"] = "cached",
@@ -1023,45 +1084,11 @@ def run_compare_styles(
         var_name="Metric",
         value_name="Metric value",
     )
-    cs = (
-        dfr.groupby(["is_independent", "ydist", "edist"])
-        .corrwith(dfr["Mean Accuracy"], numeric_only=True)  # type: ignore
-        .loc[:, metrics]
-        .reset_index()
-        .drop(columns=["ydist", "edist"])
-        .groupby("is_independent")
-        .describe(percentiles=[0.05, 0.25])
-        .T
-    )
-    c_descs = cs.T.loc[:, (slice(None), ["mean", "min", "5%", "25%", "max"])]  # type: ignore # noqa
-    print("Metric correlations with (useless) mean accuracy:")
-    print(c_descs.T.unstack())
-
-    cs = (
-        dfr.groupby(["is_independent", "ydist", "edist"])
-        .corrwith(dfr["a_rng"], numeric_only=True)  # type: ignore  # a_rrng no different really
-        .loc[:, metrics]
-        .reset_index()
-        .drop(columns=["ydist", "edist"])
-        .groupby("is_independent")
-        .describe(percentiles=[0.05, 0.25])
-        .T
-    )
-    c_descs = cs.T.loc[:, (slice(None), ["mean", "min", "5%", "25%", "max"])]  # type: ignore  # noqa
-    print("Metric correlations with accuracy range:")
-    print(c_descs.T.unstack())
-
-    cs = (
-        dfr.loc[dfr["is_independent"] == 0].groupby(["ydist", "edist"])
-        .corrwith(dfr["Error independence"])
-        .loc[:, metrics]
-        .reset_index()
-        .drop(columns=["ydist", "edist"])
-        .describe(percentiles=[0.05, 0.25])
-        .T
-    )
-    print("Metric correlations with level of dependence:")
-    print(cs)
+    print_main_correlations(dfr, restriction="")
+    df_accurate = dfr[dfr["Mean Accuracy"] > 0.6]
+    print_main_correlations(df_accurate, restriction="acc > 0.6")
+    df_accurate = dfr[dfr["Mean Accuracy"] > 0.8]
+    print_main_correlations(df_accurate, restriction="acc > 0.8")
 
     # TODO
     # 1. Look at correlation with s, and s*r
@@ -1087,13 +1114,13 @@ if __name__ == "__main__":
     # run_compare_raters()
     # run_compare_styles(n_iter=25000, mode="append")
     # run_compare_styles(n_iter=100_000, mode="cached")
-    MODE = "overwrite"
-    # MODE = "cached"
+    # MODE = "overwrite"
+    MODE = "cached"
     print("Preparing...")
     run_compare_styles(
         n_iter=500_000,
         mode=MODE,
-        make_plots=True,
+        make_plots=False,
         print_descs=True,
         no_parallel=False,
     )
