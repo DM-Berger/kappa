@@ -427,15 +427,15 @@ def rejection_sample(
     counts = np.bincount(samples, minlength=classes[-1] + 1)
     attempts = 1
     while np.any(counts == 0):
-        if attempts > 100:
+        if attempts > 150:  # this seems good enough for 200 000 repeats
             break
         attempts += 1
         samples = rng.choice(classes, size=size, p=p)
         counts = np.bincount(samples, minlength=classes[-1] + 1)
-    if attempts >= 100:
-        print(f"Could not rejection sample for dist {dist} in 100 iters.\n" f"p={p}.")
+    if attempts >= 150:
+        print(f"Could not rejection sample for dist {dist} in 150 iters.\n" f"p={p}.")
         raise RuntimeError(
-            f"Could not rejection sample for dist {dist} in 100 iters.\n" f"p={p}."
+            f"Could not rejection sample for dist {dist} in 150 iters.\n" f"p={p}."
         )
 
     return samples
@@ -490,6 +490,20 @@ def compare_error_styles(args: Namespace) -> Optional[Tuple[DataFrame, DataFrame
             # distribution `dist`. `r`` is error difference (high r means very
             # different error sets) because `r` controls how much of the max error
             # set errors occur on.
+            #
+            # It is debatable whether we should use rejection sampling here to force
+            # at least one prediction for each possible class label. This is probably
+            # most relevant in the eexp vs. exp-r case, where there is a strong bias
+            # for predictions to be the label that is the least likely in the true
+            # labels, y. Most likely this is not a realistic simulation scenario,
+            # except perhaps in cases where we are trying to predict an extremely
+            # rare class, and have designed our loss or w/e such that a very large
+            # amount of false positives is acceptable. However, since this latter case
+            # *is* in fact a fairly realistic practical scenario, at least if we have
+            # n_classes < 5 or so, there is also an argument to be made for not using
+            # rejection sampling. Either way, there is not likely to be much overall
+            # difference in this case: rejection sampling only ensures *some* of the
+            # least likely class, so the overall pattern ought to be largely unaltered.
             err_size = ceil(r * n_max_err)
             for yy in ys:
                 # ensure all errors
@@ -591,7 +605,7 @@ def get_df(
         if no_parallel:
             all_results = list(map(compare_error_styles, tqdm(GRID)))
         else:
-            all_results = Parallel(n_jobs=8, verbose=1, backend="multiprocessing")(
+            all_results = Parallel(n_jobs=-1, verbose=1, backend="multiprocessing")(
                 delayed(compare_error_styles)(args) for args in GRID
             )
             # all_results = process_map(compare_error_styles, GRID, **chunks)
@@ -1114,13 +1128,13 @@ if __name__ == "__main__":
     # run_compare_raters()
     # run_compare_styles(n_iter=25000, mode="append")
     # run_compare_styles(n_iter=100_000, mode="cached")
-    # MODE = "overwrite"
-    MODE = "cached"
+    MODE = "overwrite"
+    # MODE = "cached"
     print("Preparing...")
     run_compare_styles(
         n_iter=500_000,
         mode=MODE,
-        make_plots=False,
+        make_plots=True,
         print_descs=True,
         no_parallel=False,
     )

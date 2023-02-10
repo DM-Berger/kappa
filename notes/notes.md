@@ -6,13 +6,53 @@ useless intro junk].
 However, despite the impressive performance metrics produced by these DL models,
 the reproducibility of some of these results is @bouthillierUnreproducibleResearchReproducible2019
 
-Unfortunately, the focus on overall performance metrics like accuracies and perplexity
-scores ignores the question of the *consistency* or *stability* of those predictions
-on particular samples. While in some practical applications, it might not matter if
-sample predictions change from update to update, or with each re-tuning, in many other
-cases, this model drift [cite] may be unacceptable. In particular, any model predicting
-risks for human subjects (e.g. risk of defaulting on a loan, risk of developing a
-medical condition) should arguably
+Unfortunately, the focus on overall performance metrics like accuracies and
+perplexity scores ignores the question of the *consistency* or *stability* of
+those predictions on particular samples. While in some practical applications
+(say, recommendation systems), it might not matter if sample predictions change
+from update to update, or with each re-tuning, in other cases, this model
+drift [cite] may be unacceptable. In particular, any model predicting risks for
+human subjects (e.g. risk of defaulting on a loan, risk of developing a medical
+condition) should arguably be highly samplewise-consistent across updates.
+
+For example, in the most extreme pathological case, consider a fictional model
+which is consistently always 80% accurate in predicting a need for medical screening
+ie.e. it produces the following confusion matrix every time, on a sample of 100 subjects,
+80 of which do in fact have the condition (and thus need screening), and 20 which do not:
+
+$$
+\begin{array}{c|cc}
+\hat{y} \setminus y & P & N \\
+\hline
+P & 70^a & 10^b \\
+N & 10^c & 10^d \\
+\end{array}
+$$
+
+If subjects that are given a positive test ($\hat{y} = P$) are sent in for
+screening, then we incorrectly send in 10 subjects, and fail to screen 10
+subjects. We correctly do not always screen 10 subjects. In total, we have
+recommended 80 unique individuals for screening after this test.  Let us also
+assume that 10 of the predictions that make up cell (a) were basically just
+lucky: i.e. only 60 subjects that will develop the condition will actually
+always test positive.
+
+Now suppose we update the model, and the "lucky" 10 subjects from cell (a) are
+instead swapped with those in cell (c), and also that the 10 subjects in cell (b)
+are this time swapped with those in cell (d). The confusion matrix (and thus any
+metric which is a summary of the confusion matrix) is unchanged, but due to the b-d
+swap, 10 subjects that were *correctly* not recommended for screening last time are now
+recommended for screening, and, because of the a-c swap, the 10 subjects that were
+incorrectly *not* recommended for screening do correctly get recommended for
+screening this time. Except, now, with just one model update, the model has
+recommended the entire population for screening!
+
+Now, imagine each model update, when re-applied to these *same* subjects, cycles which
+of the subjects contribute to each of the "10" entries a-d in the confusion matrix.
+
+
+ (i.e. , but which makes errors
+on a completely different subset of samples with each model update. If
 
 ## Related Work
 
