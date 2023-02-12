@@ -1,3 +1,26 @@
+# Contents
+
+- [Contents](#contents)
+- [Introduction](#introduction)
+  - [Related Work](#related-work)
+  - [A Worked Example](#a-worked-example)
+- [Samplewise Consistency Metrics](#samplewise-consistency-metrics)
+  - [Sources of Variation](#sources-of-variation)
+  - [Samplewise Metrics Summarize Along Repetitions](#samplewise-metrics-summarize-along-repetitions)
+  - [Paired Samplewise Consistency Metrics](#paired-samplewise-consistency-metrics)
+  - [Candidate Metrics](#candidate-metrics)
+    - [Error-Based](#error-based)
+      - [Set-Based](#set-based)
+    - [Prediction-Based](#prediction-based)
+    - [Point-Process or Process-Based](#point-process-or-process-based)
+  - [Metric Evaluation](#metric-evaluation)
+  - [Simulations](#simulations)
+    - [Simulation Details](#simulation-details)
+    - [Class Distributions](#class-distributions)
+- [Appendix A: Generating Discrete Distributions](#appendix-a-generating-discrete-distributions)
+- [References](#references)
+
+
 # Introduction
 
 Deep learning with neural networks (DL) has yielded remarkable advances in [bla bla bla, more
@@ -25,42 +48,86 @@ be highly samplewise-consistent across updates.
 - robustness research, including adversarial robustness
 - bootstrapped error estimates
 - model churn and prediction difference
+- ergodicity issues[@molenaarNewPersonSpecificParadigm2009a]
 
 
 ## A Worked Example
 
 For example, in the most extreme pathological case, consider a fictional model
 which is consistently always 80% accurate in predicting a need for medical screening
-ie.e. it produces the following confusion matrix every time, on a sample of 100 subjects,
-80 of which do in fact have the condition (and thus need screening), and 20 which do not:
+ie.e. it produces the following confusion matrix every time, on a sample of 10 subjects,
+80 of which do in fact have the condition (and thus need screening), and 2 which do not:
 
 $$
 \begin{array}{c|cc}
 \hat{y} \setminus y & P & N \\
 \hline
-P & 70^a & 10^b \\
-N & 10^c & 10^d \\
+P & 7^a & 1^b \\
+N & 1^c & 1^d \\
 \end{array}
 $$
 
 If subjects that are given a positive test ($\hat{y} = P$) are sent in for
-screening, then we incorrectly send in 10 subjects, and fail to screen 10
-subjects. We correctly do not always screen 10 subjects. In total, we have
-recommended 80 unique individuals for screening after this test.  Let us also
-assume that 10 of the predictions that make up cell (a) were basically just
-lucky: i.e. only 60 subjects that will develop the condition will actually
-always test positive.
+screening, then we incorrectly send in 1 subject, and fail to screen 1
+subject. We correctly do not always screen 1 subject. In total, we have
+recommended 8 unique individuals for screening after this test.  Let us also
+assume that 1 of the predictions that make up cell (a) were basically just
+lucky: i.e. only 6 subject that will develop the condition will actually
+always test positive. That is, if subjects have ids 0, ..., 9, then cell (a)
+always contains subjects 0, 1, 2, ..., 5. Let us also supposed subjects 7 and 8
+also are positive (should be tested), and thus that subjects 0, 9 are the actual negatives.
 
-Now suppose we update the model, and the "lucky" 10 subjects from cell (a) are
-instead swapped with those in cell (c), and also that the 10 subjects in cell (b)
-are this time swapped with those in cell (d). The confusion matrix (and thus any
-metric which is a summary of the confusion matrix) is unchanged, but due to the b-d
-swap, 10 subjects that were *correctly* not recommended for screening last time are now
-recommended for screening, and, because of the a-c swap, the 10 subjects that were
-incorrectly *not* recommended for screening do correctly get recommended for
-screening this time. With just one model update, the model has
-recommended the entire population for screening! And this pathological behaviour
-is essentially invisible with aggregate performance metrics.
+Then documenting only the subjects
+that can be "moved around" across classifications, we might have gotten for
+the first prediction:
+
+$$
+\begin{array}{cccccc}
+\text{Cell} & y & \hat{y} & \text{IDs (always)}  & \text{ID (this time)} & \text{Total} \\
+\hline
+a & P & P & \{0, 1 ,2, 3, 4, 5\} &  7 & 7 \\
+b & N & P &          -           &  9 & 1 \\
+c & P & N &          -           &  6 & 1 \\
+d & N & N &          -           &  8 & 1 \\
+\end{array}
+$$
+
+That is, true labels and predictions are:
+
+$$\begin{align*}
+\text{ID} &= [0, 1, 2, 3, 4, 5 \;\vert\; 6, 7, 8, 9] \\
+y         &= [1, 1, 1, 1, 1, 1 \;\vert\; 1, 1, 0, 0] \\
+\hat{y}_1 &= [1, 1, 1, 1, 1, 1 \;\vert\; 0, 1, 0, 1] \\
+\end{align*}$$
+
+Now suppose we update the model, and the "lucky" 1 subjects from cell (a) are
+instead swapped with those in cell (c), and also that the 1 subject in cell (b)
+is this time swapped with the one in cell (d).
+
+$$
+\begin{array}{cccccc}
+\text{Cell} & y & \hat{y} & \text{IDs (always)}  & \text{ID (this time)} & \text{Total} \\
+\hline
+a & P & P & \{0, 1 ,2, 3, 4, 5\} &  6 & 7 \\
+b & N & P &          -           &  8 & 1 \\
+c & P & N &          -           &  7 & 1 \\
+d & N & N &          -           &  9 & 1 \\
+\end{array}
+$$
+
+$$\begin{align*}
+\text{ID} &= [0, 1, 2, 3, 4, 5 \;\vert\; 6, 7, 8, 9] \\
+y         &= [1, 1, 1, 1, 1, 1 \;\vert\; 1, 1, 0, 0] \\
+\hat{y}_2 &= [1, 1, 1, 1, 1, 1 \;\vert\; 1, 0, 1, 0] \\
+\end{align*}$$
+
+
+The confusion matrix and even distribution of predictions is unchanged, but every
+subject has been classified differently. With just one model update, the entire
+population has been classified into the "positive" category at least once, and
+the model which appears to be 80% accurate (or e.g. have an $F_1$-score of 70%)
+is in fact only consistently predicting 60% of the population.
+
 
 There are a number of important points to observe from this example:
 
@@ -78,53 +145,184 @@ There are a number of important points to observe from this example:
    unaltered)
 
 
+Thus, any metric that can be used to detect this problem *must*
+must make use of sample individuality in some way, that it, the metric is defined
+through computations that are *samplewise* in some fundamental way.
 
 
 
+# Samplewise Consistency Metrics
 
 
-
-
-# Consistency Metrics
-
-Thus, any metric that can be used to detect this problem *must* either:
-
-1. must make use of sample individuality (e.g. a unique identifier), OR
-1. be sensitive to the ordering of the samples
-
-An $n$-arity samplewise consistency metric $m(\hat{y}_1, \dots, \hat{y}_n) \ge 0$:  must satisfy:
+Given $n$ predictions $\hat{\symbfit{y}}_1, \dots, \hat{\symbfit{y}}_n$ on the
+same $N$ individual samples, i.e.$\hat{\symbfit{y}}_i = f_i(\symbfit{x})$ for each $i$, an $n$-arity **samplewise consistency metric**
+$\mathcal{C}(\hat{\symbfit{y}}_1, \dots, \hat{\symbfit{y}}_n) \ge 0$:  must satisfy:
 
 $$\begin{align*}
- \quad \hat{y}_i \ne \hat{y}_j \; & \forall i \ne j & \implies m(\hat{y}_1, \dots, \hat{y}_n) < 1 \\
- \quad \hat{y}_i = \hat{y}_j \;  & \forall i, j & \implies m(\hat{y}_1, \dots, \hat{y}_n) = 1 \\
+& \text{If there exists } i, j \text{ such that } i \ne j \text{ and }  \hat{\symbfit{y}}_i \ne \hat{\symbfit{y}}_j  \text{ then:} & \mathcal{C}(\hat{\symbfit{y}}_1, \dots, \hat{\symbfit{y}}_n) < 1 \\
+& \text{If for all } i, j \; \hat{\symbfit{y}}_i = \hat{\symbfit{y}}_j \;  \text{ then:} & \mathcal{C}(\hat{\symbfit{y}}_1, \dots, \hat{\symbfit{y}}_n) = 1 \\
+\end{align*}$$
+
+where $\hat{\symbfit{y}}_i = \hat{\symbfit{y}}_j$ if and only if element-wise equality holds, i.e.:
+
+$$\hat{\symbfit{y}}_i^{(k)} = \hat{\symbfit{y}}_m^{(k)} \text{ for } k = 1, \dots, N.$$
+
+Note that $k$ above functions as both as the *index* and the *unique identifier* for each sample.
+
+We also define an $n$-arity **samplewise error consistency metric**: given $n$
+predictions $\hat{\symbfit{y}}_1, \dots, \hat{\symbfit{y}}_n$ on the same $N$
+individual samples, and true labels $\symbfit{y}$, and residual vectors
+$\symbfit{r}_i = [\symbfit{y} \ne \hat{\symbfit{y}}_i]$ (where $[\cdot]$ is the
+[Iverson bracket](https://en.wikipedia.org/wiki/Iverson_bracket), applied
+elementwise, i.e. each $\symbfit{r}_i$ is a vectors of $0$s and $1$s), then
+$\mathcal{E}(\symbfit{r}_1, \dots, \symbfit{r}_n) \ge 0$ must satisfy:
+
+$$\begin{align*}
+& \text{If there exists } i, j \text{ such that } i \ne j \text{ and }  \symbfit{r}_i \ne \symbfit{r}_j  \text{ then:} & \mathcal{E}(\symbfit{r}_1, \dots, \symbfit{r}_n) < 1 \\
+& \text{If for all } i, j \; \symbfit{r}_i = \symbfit{r}_j \;  \text{ then:} & \mathcal{E}(\symbfit{r}_1, \dots, \symbfit{r}_n) = 1 \\
 \end{align*}$$
 
 
-For a metric to be a useful prediction reproducibility or reliability metric, it
-should have the following qualities:
+For a consistency or error consistency metric to have value, it should:
 
-- it should have direct, practical intepretability
-- it should not require false assumptions for interpretation or validity
-  - e.g. normality, independence of predictions
-- it should be simply defined
-- it should contain novel information not present in simpler statistics
-  - the novel information should not be confounded with something uninteresting
-  - it should be *moderately* related to known quantities
-    - e.g. a reproducibility metric should be somewhat related to accuracy, accuracy variance
-      without being either completely uncorrelated or perfectly correlated
+- have direct, practical intepretability
+- not require particular distributional or independence assumptions
+  on $\hat{y}_i$s for interpretation or validity
+- contain novel information (not be too strongly-corrlated with simpler statistics)
+- be simple to define and compute
 
 
 Ideally, a good metric also:
 
-- is relatively insensitive to class distributions and number of classes
+- is not overly sensitive to class distributions and number of classes
   in the classification problem
 - is sensitive to a discrepancy between prediction distributions and true distributions
 - distinguishes between random vs. non-random (dependent) predictions
-- [BONUS]: should be naturally extendable to the regression context
+- \[BONUS]: can be naturally extended to the regression context
+
+## Sources of Variation
+
+Of course, given identical training data and training hyperparameters,
+non-stochastic algorithms will necessarily have perfect consistency on any test
+set. Consistency metrics are not designed for this case, but for contexts where
+there are "small" variations in data and/or procedure, but a consistent /
+shared validation set. We are most interested in the cases:
+
+1. **Hyperparameter sensitivity**: $\hat{\symbfit{y}}_i = f(\theta_i;
+   \symbfit{x})$ for hyperparameters $\theta_i \in \mathbb{R}^h$ close to some
+   tuned or default hyperparamter values $\theta^{\star}$
+2. **Training sample variability**: where $\hat{\symbfit{y}}_i = f_i(\symbfit{x})$,
+   and $f_i$ differ due to different training data (e.g. bootstrap, k-fold)
+3. **Training robustness**: where $\hat{\symbfit{y}}_i = f_i(\symbfit{x})$, and
+   $f_i$ differ because each is trained on data $\tilde{\symbfit{x}}_i$, where
+   $\tilde{\symbfit{x}}_i$ is some minor perturbation (e.g. addition of noise)
+   of the training data
+4. Combinations of the above
+
+Thus we always discuss consistency metrics with respect to a source of variance
 
 
 
-## Pairwise Reproducibility Metrics
+## Samplewise Metrics Summarize Along Repetitions
+
+
+Most supervised ML or DL algorithms expect a data matrix or array $\mathbf{X}
+\in \mathbb{R}^{N \times \mathbf{F}}$, where $\mathbf{F}$ comprises the
+*feature dimensions*, and where there are $N$ samples which form the *sample
+dimension or index*. For example, with tabular data $\mathbf{F} = 1$, and with
+image data, as in a typical CNN, $\mathbf{F} = \text{C} \times \text{H} \times
+\text{W}$ for images with channel, height, and width dimensions. Given targets
+$\mathbf{Y} \in \mathbb{R}^{N \times \mathbf{T}}$, where $\mathbf{T}$ can have
+almost any dimensionality, like $\mathbf{F}$, then most such algorithms also
+can be optimized by choosing a suitable loss function $\mathcal{L}_i$ such that
+$\mathcal{L}_i(\hat{\symbfit{y}}_i, \symbfit{y}_i) \in \mathbb{R}$ for each
+sample prediction $\hat{\symbfit{y}}_i = f(\symbfit{x}_i)$, where
+$\symbfit{x}_i \in \mathbb{R}^{1 \times \mathbf{F}}$ of $\mathbf{X}$, and
+likewise $\symbfit{y}_i \in \mathbf{R}^{1 \times \mathbf{T}}$).
+
+This per-sample loss is also usually aggregated (e.g. getting an average loss
+in batch-based gradient descent) along the sample dimension, to get an aggregate
+loss (typically the mean) for a batch over  $\mathbf{X}$ and $\mathbf{Y}$ defined as above:
+
+$$\mathcal{L}(\symbfit{X}, \hat{\symbfit{Y}}) = \underset{i}{\text{agg}} \left(\mathcal{L}_i(\hat{\symbfit{y}}_i, \symbfit{y}_i) \right)$$
+
+Likewise, there is usually a performance metric $\mathcal{M}$. $\mathcal{M}$
+may also have a samplewise form $\mathcal{M}_i$, in which case the overall
+performance will be defined like the aggregate loss directly above. Example
+common performance metrics with this property include the accuracy and
+mean-absolute error. In other cases, the performance metric may have
+only an aggregate form, such as with confusion-matrix based metrics like
+Cohen's Kappa, f1-score, AUROC, and etc. [In NumPy or PyTorch code, metrics
+with a samplewise form support an `axis` or `dim` argument in their function calls].
+
+Now suppose we have an iterated context in which we fit a model many times,
+yielding predictions $\hat{\symbfit{Y}}^{(1)}, \dots,
+\hat{\symbfit{Y}}^{(\tau)}$. The usual approach is to collect
+$\{\mathcal{L}^{(1)}, \dots, \mathcal{L}^{(\tau)}\}$ or $\{\mathcal{M}^{(1)},
+\dots, \mathcal{M}^{(\tau)}\}$ and then compute point estimates to summarize
+these quantities. The mean is typically taken as the performance estimate, and,
+***very*** occasionally, a variance (or other measure of scale, like a range or
+confidence interval) is taken as a reproducibility metric
+[@bouthillierAccountingVarianceMachine2021].
+
+When the performance metric has a samplewise form, then, the final performance
+estimate $M$ ends up being:
+
+$$\begin{align*}
+M &= \frac{1}{\tau} \sum_{r=1}^\tau \mathcal{M}^{(r)}(\hat{\symbfit{Y}}, \symbfit{Y}) \\
+M &= \frac{1}{\tau} \sum_{r=1}^\tau \underset{i}{\text{agg}} \left( \mathcal{M}_i^{(r)}(\hat{\symbfit{y}}_i, \symbfit{y}_i)\right) \\
+\end{align*}$$
+
+In Pythonic pseudocode:
+
+```
+# `y_true` is array of true predictions with shape (N, *TARGET_DIMENSIONS)
+# `preds` is array of shape (tau, N, *TARGET_DIMENSIONS)
+
+perfs = []
+for i in range(tau):
+    perfs.append(perf_metric(y_true, preds[i, :, :]))
+perf = mean(perfs)  # mean of `tau` summary metrics
+```
+
+We propose instead to consider the repetitions as an additional *repeat dimension*,
+such that
+
+$$
+\mathbf{Y}_{\text{rep}} = [\hat{\symbfit{Y}}^{(1)}; \;\dots\; ; \hat{\symbfit{Y}}^{(\tau)}] \in \mathbb{R}^{\tau \times N \times \mathbf{T}}
+$$
+
+and that instead we first summarize along the reptition dimension. I.e.
+
+```
+consistencies = []
+for j in range(N):
+    consistencies.append(consistency_metric(y_true, preds[:, j, :]))
+consistency = mean(consistencies)  # mean of `N` consistency metrics
+```
+
+or
+
+$$
+\frac{1}{N} \sum_{i=1}^N \mathcal{C}(\hat{\symbfit{y}}_1, \dots, \hat{\symbfit{y}}_{\tau}) \\
+$$
+
+for a $\tau$-ary consistency metric with $\tau$ repetitions. However, if we have $\tau$ repetitions,
+and an $n$-ary consistency metric, then we define the mean consistency to be:
+
+$$
+\frac{1}{k} \sum_{S} \mathcal{C}_S(\hat{\symbfit{y}}_1, \dots, \hat{\symbfit{y}}_n) \\
+$$
+
+where $S$ is the set of all unique combinations of predictions of size $n$, and
+$k = \binom{\tau}{n}$, i.e., where $M$ is the ***average of all the prediction
+consistencies on prediction subsets of size $n$***. I.e. for a binary consistent
+metric, the average consistency will summarize $\tau(\tau - 1)/2$ prediction pairings.
+
+
+
+
+## Paired Samplewise Consistency Metrics
 
 Reproducibility metrics need to operate on repeated model runs that share a
 validation set of some size $n$. Each repeat evaluation $i$ yields a single
