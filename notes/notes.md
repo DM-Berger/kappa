@@ -140,9 +140,7 @@ There are a number of important points to observe from this example:
 3. the pathological behaviour is invisible from gross / aggregate metrics (accuracy
    F1 score, etc.)
 4. the pathological behaviour also cannot be detected by comparing
-   the distributions of the class predictions across repetitions (the confusion
-   matrix is unaltered, and in fact the observed prediction distributions are
-   unaltered)
+   the distributions of the class predictions across repetitions
 
 
 Thus, any metric that can be used to detect this problem *must*
@@ -154,18 +152,66 @@ through computations that are *samplewise* in some fundamental way.
 # Samplewise Consistency Metrics
 
 
-Given $n$ predictions $\hat{\symbfit{y}}_1, \dots, \hat{\symbfit{y}}_n$ on the
-same $N$ individual samples, i.e.$\hat{\symbfit{y}}_i = f_i(\symbfit{x})$ for each $i$, an $n$-arity **samplewise consistency metric**
-$\mathcal{C}(\hat{\symbfit{y}}_1, \dots, \hat{\symbfit{y}}_n) \ge 0$:  must satisfy:
+Given $p$ predictions $Y = \{\hat{\symbfit{y}}_1, \dots, \hat{\symbfit{y}}_p\}$ on the
+same $N$ individual samples, i.e.$\hat{\symbfit{y}}_i = f_i(\symbfit{x})$ for each $i$, and $n \le p$,
+an **$n$-arity samplewise consistency metric** $\mathcal{C} \in [0, 1]$ is computed across all combinations
+of size $n$ of $Y$, i.e. over the $K = \binom{p}{n}$ collections of predictions of the set $\binom{Y}{n}$.
+That is, for any permutation $\sigma$ of $\{1, \dots, n\}$ we can state:
+
+$$
+\mathcal{C}(\hat{\symbfit{y}}_1, \dots, \hat{\symbfit{y}}_n) = \mathcal{C}(\hat{\symbfit{y}}_{\sigma(1)}, \dots, \hat{\symbfit{y}}_{\sigma(n)})
+$$
+
+
+and can thus enumerate all consistencies as as $\mathcal{C}_1, \dots,
+\mathcal{C}_K$, and compute a mean, which we shall simply denote as
+$\mathcal{C}$. Then all such $\mathcal{C}$ and must satisfy the basic
+conditions:
 
 $$\begin{align*}
-& \text{If there exists } i, j \text{ such that } i \ne j \text{ and }  \hat{\symbfit{y}}_i \ne \hat{\symbfit{y}}_j  \text{ then:} & \mathcal{C}(\hat{\symbfit{y}}_1, \dots, \hat{\symbfit{y}}_n) < 1 \\
-& \text{If for all } i, j \; \hat{\symbfit{y}}_i = \hat{\symbfit{y}}_j \;  \text{ then:} & \mathcal{C}(\hat{\symbfit{y}}_1, \dots, \hat{\symbfit{y}}_n) = 1 \\
+& \text{If (and only if) for all } i \ne j \text{ and any } k,  \hat{\symbfit{y}}_i^{(k)} \ne \hat{\symbfit{y}}_j^{(k)},  \text{ then:} & \mathcal{C} & = 0 \\
+& \text{If (and only if) for all } i, j \; \hat{\symbfit{y}}_i = \hat{\symbfit{y}}_j \;  \text{ then:} & \mathcal{C} &= 1 \\
+& \text{If (and only if) there exists } i, j \text{ such that } i \ne j \text{ and }  \hat{\symbfit{y}}_i \ne \hat{\symbfit{y}}_j  \text{ then:} & \mathcal{C} & < 1 \\
 \end{align*}$$
 
 where $\hat{\symbfit{y}}_i = \hat{\symbfit{y}}_j$ if and only if element-wise equality holds, i.e.:
 
 $$\hat{\symbfit{y}}_i^{(k)} = \hat{\symbfit{y}}_m^{(k)} \text{ for } k = 1, \dots, N.$$
+
+That is, $\mathcal{C}$ is zero only when there is perfect disagreement, and
+unity only when there is perfect agreement.  Note also, as per the worked
+example, and given confusion matrices $A_i$ corresponding to $(\symbfit{y}, \hat{\symbfit{y}})$ pairs, there must not exist
+a function $g$ such that
+
+$$
+\mathcal{C}(\hat{\symbfit{y}}_1, \dots, \hat{\symbfit{y}}_n) = g(A_1, \dots, A_n)
+$$
+
+i.e., the consistency metric must not be completely dependent and/or derivable from
+the set of confusion matrices of the predictions.
+
+For this metric to provide interpretable, information, we also require it to have reasonable
+behaviour with respect to classifier the accuracies, $a_i = \text{acc}(\symbfit{y}, \hat{\symbfit{y}}_i)$:
+
+
+$$\begin{align*}
+& \text{As all } \hat{\symbfit{y}}_i \text{ approach } \symbfit{y} \text{ (i.e. as } \bar{a} \text{ approaches 1)}:& \mathcal{C}  & \rightarrow 1 \\
+\end{align*}$$
+
+However, the converse should not in general be true (perfect consistency can occur when .
+predictions are identical, but incorrect), nor will there necessarily be a tendency
+for $\mathcal{C} \rightarrow 0$ as $\bar{a} \rightarrow 0$. In particular, when errors
+are random, the consistency should be related to observed and/or actual class distributions
+in the training and test sets.
+
+
+NOTE: highly correlated with acc can still be useful because then a disagreement between
+acc and consistency metric is a red flag:
+
+Actually, we want something stronger, namely, that we cannot *predict* $\mathcal{C}$ from the
+confusion matrices, i.e. consistency metrics should be reasonably *independent* of performance
+metrics. We will see that
+
 
 Note that $k$ above functions as both as the *index* and the *unique identifier* for each sample.
 
@@ -311,7 +357,7 @@ for a $\tau$-ary consistency metric with $\tau$ repetitions. However, if we have
 and an $n$-ary consistency metric, then we define the mean consistency to be:
 
 $$
-\frac{1}{k} \sum_{S} \mathcal{C}_S(\hat{\symbfit{y}}_1, \dots, \hat{\symbfit{y}}_n) \\
+\frac{1}{k} \sum_{s \in S} \mathcal{C}(\hat{\symbfit{y}}_{s_1}, \dots, \hat{\symbfit{y}}_{s_n}) \\
 $$
 
 where $S$ is the set of all unique combinations of predictions of size $n$, and
