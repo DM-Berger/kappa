@@ -949,7 +949,7 @@ def print_main_correlations(df_renamed: DataFrame, restriction: str = "") -> Non
     )
     c_descs = cs.T.loc[:, (slice(None), ["mean", "min", "5%", "25%", "max"])]  # type: ignore # noqa
     print(f"Metric correlations with (useless) mean accuracy{desc}:")
-    print(c_descs.T.unstack())
+    print(c_descs.T.unstack().round(3))
 
     # a_rrng is no different than below, corrs not due to outliers
     cs = (
@@ -964,7 +964,7 @@ def print_main_correlations(df_renamed: DataFrame, restriction: str = "") -> Non
     )
     c_descs = cs.T.loc[:, (slice(None), ["mean", "min", "5%", "25%", "max"])]  # type: ignore  # noqa
     print(f"Metric correlations with accuracy range{desc}:")
-    print(c_descs.T.unstack())
+    print(c_descs.T.unstack().round(3))
 
     cs = (
         dfr.loc[dfr["is_independent"] == 0]
@@ -977,7 +977,7 @@ def print_main_correlations(df_renamed: DataFrame, restriction: str = "") -> Non
         .T
     )
     print(f"Metric correlations with level of dependence:{desc}")
-    print(cs)
+    print(cs.round(3))
 
     cs = (
         dfr.loc[dfr["is_independent"] == 0]
@@ -990,7 +990,7 @@ def print_main_correlations(df_renamed: DataFrame, restriction: str = "") -> Non
         .T
     )
     print(f"Metric correlations with error set max size:{desc}")
-    print(cs)
+    print(cs.round(3))
 
 
 def run_compare_styles(
